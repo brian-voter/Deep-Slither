@@ -11,16 +11,52 @@ import org.opencv.core.Mat;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 public class NeuralNet {
 
     private MultiLayerNetwork net = null;
-    private NativeImageLoader loader = new NativeImageLoader(200, 200, 3);
+    private NativeImageLoader loader = new NativeImageLoader(150, 150, 3);
+    private List<String> labelNames = Arrays.asList("FOOD", "PREY", "WORM");
 
     public NeuralNet () throws IOException {
 
         File netSaveFile = new File("D:\\Documents\\wormsAIModels\\model.bin");
         net = ModelSerializer.restoreMultiLayerNetwork(netSaveFile);
+
+    }
+
+    public void process(List<Blob> blobs) throws Exception {
+
+        if (blobs.size() == 0) {
+            return;
+        }
+
+//        DataSet ds = new DataSet();
+//        ds.setLabelNames(labelNames);
+
+        for (Blob b : blobs) {
+            org.bytedeco.javacpp.opencv_core.Mat mat = new org.bytedeco.javacpp.opencv_core.Mat((Pointer)null)
+            { { address = b.mat.getNativeObjAddr(); } };
+
+
+            INDArray arr = loader.asMatrix(mat);
+//            System.out.println(arr);
+//            ds.addFeatureVector(arr);
+
+            b.blobType = BlobType.fromInt(net.predict(arr)[0]);
+            System.out.println(b.blobType);
+        }
+//        DataSetIterator it = new ViewIterator(ds, 7);
+
+//        net.labelProbabilities(ds.getFeatures());
+
+//        List<String> predictions = net.predict(ds);
+//
+//        for (int i = 0; i < predictions.size(); i++) {
+//            blobs.get(i).blobType = BlobType.valueOf(predictions.get(i));
+//        }
 
     }
 

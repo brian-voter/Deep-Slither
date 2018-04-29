@@ -16,21 +16,16 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class WormsAI {
 
-    public static final int STEP = 4;
-    public static final int MIN_SIZE_FOR_WORM = 100;
-    public static final int REFRESH_DELAY = 100;
+    private static final int REFRESH_DELAY = 100;
     public static final String CAPTURE_DIRECTORY = "D:\\Documents\\wormImages\\";
     private static final int SCORE_WINDOW = 30;
-    private static VisionState target;
     private static ArrayList<VisionStateReduced> states = new ArrayList<>();
-    private static AtomicBoolean mouseDown = new AtomicBoolean();
     private static Vision3 vision;
     private static ImgHashBase hashAlgo;
     private static WebDriverExecutor webExe;
@@ -54,11 +49,7 @@ public class WormsAI {
         webExe = new WebDriverExecutor();
         webExe.navigate();
 
-        try {
-            captureLoop();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        captureLoop();
     }
 
     private static void registerMouseListener() {
@@ -72,7 +63,7 @@ public class WormsAI {
         Logger.getLogger(GlobalScreen.class.getPackage().getName()).setLevel(Level.SEVERE);
     }
 
-    private static void captureLoop() throws IOException {
+    private static void captureLoop() {
 
         hashAlgo = ColorMomentHash.create();
 
@@ -88,14 +79,7 @@ public class WormsAI {
 
                 VisionState vs = vision.process(capture);
 
-                if (frame == null) {
-                    frame = new JFrame("WormsAI");
-                    frame.setSize(vs.mat.width(), vs.mat.height());
-                    frame.setLocation(-1900, 400);
-                    frame.setVisible(true);
-                    imageLabel = new JLabel(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
-                    frame.add(imageLabel);
-                }
+                setupFrame(vs);
 
                 imageLabel.setIcon(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
 
@@ -141,6 +125,17 @@ public class WormsAI {
 
     }
 
+    private static void setupFrame(VisionState vs) {
+        if (frame == null) {
+            frame = new JFrame("WormsAI");
+            frame.setSize(vs.mat.width(), vs.mat.height());
+            frame.setLocation(-1900, 500);
+            frame.setVisible(true);
+            imageLabel = new JLabel(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
+            frame.add(imageLabel);
+        }
+    }
+
     private static void delayStep(long stepStartTime) throws InterruptedException {
         long stepFinishTime;
         stepFinishTime = System.currentTimeMillis();
@@ -183,7 +178,7 @@ public class WormsAI {
                 Point point = null;
                 boolean boost = false;
 
-                if (vs.worms.size() == 0) {
+                if (vs.worms.size() == 0 && vs.prey.size() == 0) {
                     if (vs.food.size() > 0) {
                         try {
                             Blob max = vs.food.stream().max(Comparator.comparingDouble(c ->
@@ -241,8 +236,9 @@ public class WormsAI {
         for (int i = 0; i < states.size(); i++) {
             for (int j = i + 1; j < states.size(); j++) {
                 if (hashAlgo.compare(states.get(i).hash, states.get(j).hash) < 5) {
-                    VisionStateReduced newVSR = VisionStateReduced.clone(states.get(i));
-                    newVSR.quality = (states.get(i).quality + states.get(j).quality) / 2;
+                    VisionStateReduced newVSR = states.get(i).quality > states.get(j).quality ?
+                            VisionStateReduced.clone(states.get(i)) : VisionStateReduced.clone(states.get(j));
+//                    newVSR.quality = (states.get(i).quality + states.get(j).quality) / 2;
                     combined.add(newVSR);
                     combined.remove(states.get(i));
                     combined.remove(states.get(j));
@@ -252,6 +248,7 @@ public class WormsAI {
 
         states = combined;
         System.out.println("Combined: " + (sizeBefore - states.size()));
+        System.out.println("States: " + states.size());
     }
 
     private static void updateScore(VisionState vs) {

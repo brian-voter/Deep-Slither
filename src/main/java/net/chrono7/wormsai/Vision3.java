@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 public class Vision3 {
 
@@ -27,7 +26,7 @@ public class Vision3 {
 
     private NeuralNet net = new NeuralNet();
 
-    public Vision3 () throws IOException {
+    public Vision3() throws IOException {
 
     }
 
@@ -125,12 +124,18 @@ public class Vision3 {
         AtomicReference<Blob> self = new AtomicReference<>();
         List<MatOfPoint> selfContour = new ArrayList<>();
 
-        List<Blob> food = new ArrayList<>();
 
         List<MatOfPoint> wormsMats = new ArrayList<>();
+        List<MatOfPoint> foodMats = new ArrayList<>();
+        List<MatOfPoint> preyMats = new ArrayList<>();
+        List<Blob> worms = new ArrayList<>();
+        List<Blob> food = new ArrayList<>();
+        List<Blob> prey = new ArrayList<>();
+        List<Blob> unknown = new ArrayList<>();
+
         List<MatOfPoint> wormsPolys = new ArrayList<>();
 
-        List<Blob> worms = contours.stream().map(c -> {
+        for (MatOfPoint c : contours) {
             MatOfPoint2f m2 = new MatOfPoint2f();
             c.convertTo(m2, CvType.CV_32F);
 
@@ -139,15 +144,13 @@ public class Vision3 {
             //Set to 0 if it the center mouseLoc of the image is on or inside the polygon
             dstToCenter = dstToCenter >= 0 ? 0 : Math.abs(dstToCenter);
 
-            return new Blob(c, m2, dstToCenter, Imgproc.contourArea(c), BlobType.UNKNOWN);
+            Blob b = new Blob(c, m2, dstToCenter, Imgproc.contourArea(c), BlobType.UNKNOWN);
 
-        }).filter(b -> {
             if (b.distanceFromCenter > 0) {
                 // This contour is not the self
 
+                // All worms seem to have an area of ~6000. Filters out food.
                 if (Imgproc.contourArea(b.contour) > 5500) {
-                    // All worms seem to have an area of ~6000. Filters out food.
-
 
                     Point blobCenter = new Point();
                     float[] radiusArr = new float[1];
@@ -162,49 +165,86 @@ public class Vision3 {
                     float extent = ((float) b.area) / circleArea;
 
                     //likey big blob
-                    if (extent > 0.6) {
+//                    if (extent > 0.6) {
+//                        food.add(b);
+//                    } else {
 
-                        food.add(b);
-                        return false;
-                    } else {
+                        b.mat = captureBlob(m_in, b);
+                        unknown.add(b);
 
-                        b.blobType = captureBlob(m_in, b);
-
-                        if (b.blobType == BlobType.WORM) {
-                            wormsMats.add(b.contour);
-                            return true;
-                        } else {
-                            food.add(b);
-                            return false;
-                        }
+//                        b.blobType = captureBlob(m_in, b);
+//
+//                        if (b.blobType == BlobType.WORM) {
+//                            wormsMats.add(b.contour);
+//                            worms.add(b);
+//                        } else {
+//                            food.add(b);
+//                        }
 
                         //ROI credit: http://answers.opencv.org/question/497/extract-a-rotatedrect-area/?answer=518#post-id-518
 
-                    }
+//                    }
 
                 } else {
                     //Save this blob
                     food.add(b);
-                    return false;
                 }
             } else {
-
                 //This worm is the self
                 selfContour.add(b.contour);
                 self.set(b);
-                return false;
             }
-        }).collect(Collectors.toList());
-
-        if (self.get() == null) {
-            worms.sort(Comparator.comparingDouble(b -> b.distanceFromCenter));
-            self.set(worms.get(0));
-            worms.remove(self.get());
-            selfContour.add(self.get().contour);
         }
 
         try {
-            Imgproc.fillPoly(out, wormsMats, Scalar.all(255));
+            net.process(unknown);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        for (Blob next : unknown) {
+            switch (next.blobType) {
+                case WORM:
+                    worms.add(next);
+                    wormsMats.add(next.contour);
+//                    System.out.println("WORM IT");
+                    break;
+                case FOOD:
+                    foodMats.add(next.contour);
+                    food.add(next);
+//                    System.out.println("FOOD IT");
+                    break;
+                case PREY:
+//                    System.out.println("PREY IT");
+                    prey.add(next);
+                    preyMats.add(next.contour);
+                    break;
+            }
+        }
+
+        if (self.get() == null) {
+            if (worms.size() > 0) {
+                worms.sort(Comparator.comparingDouble(b -> b.distanceFromCenter));
+                self.set(worms.get(0));
+                worms.remove(self.get());
+                selfContour.add(self.get().contour);
+            }
+        }
+
+        try {
+            Imgproc.fillPoly(out, foodMats, Scalar.all(255));
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Imgproc.fillPoly(out, wormsMats, new Scalar(0, 0, 255));
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Imgproc.fillPoly(out, preyMats, new Scalar(0, 255, 0));
         } catch (NullPointerException e) {
             e.printStackTrace();
         }
@@ -215,10 +255,10 @@ public class Vision3 {
             e.printStackTrace();
         }
 
-        return new VisionState(out, worms, food, self.get(), System.currentTimeMillis());
+        return new VisionState(out, worms, food, prey, self.get(), System.currentTimeMillis());
     }
 
-    private BlobType captureBlob(Mat m_in, Blob b) {
+    private Mat captureBlob(Mat m_in, Blob b) {
         RotatedRect rect = Imgproc.minAreaRect(b.mp2f);
         // matrices we'll use
         Mat rotMatrix, rotated = new Mat(), cropped = new Mat();
@@ -254,19 +294,18 @@ public class Vision3 {
         // crop the resulting image
         Imgproc.getRectSubPix(rotated, rect_size, rect.center, cropped);
 
-        BlobType result = BlobType.UNKNOWN;
+//        BlobType result = BlobType.UNKNOWN;
+//
+//        try {
+//            result = net.process(cropped);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 
-        try {
-            result = net.process(cropped);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        Imgcodecs.imwrite("D:\\Documents\\wormImages\\" +
+//                String.valueOf(System.currentTimeMillis()) + ".png", cropped);
 
-        Imgcodecs.imwrite("D:\\Documents\\wormImages\\" +
-                String.valueOf(System.currentTimeMillis()) + ".png", cropped);
-
-        return result;
-
+        return cropped;
 
     }
 
