@@ -151,44 +151,47 @@ public class Vision3 {
 
                 // All worms seem to have an area of ~6000. Filters out food.
                 if (Imgproc.contourArea(b.contour) > 5500) {
-
-                    Point blobCenter = new Point();
-                    float[] radiusArr = new float[1];
-
-                    Imgproc.minEnclosingCircle(b.mp2f, blobCenter, radiusArr);
-
-                    int radius = (int) radiusArr[0];
-
-                    int circleArea = (int) (Math.PI * radius * radius);
-
-                    //ratio of contour area to minimum enclosing circle area
-                    float extent = ((float) b.area) / circleArea;
-
-                    //likey big blob
-//                    if (extent > 0.6) {
-//                        food.add(b);
-//                    } else {
-
-                        b.mat = captureBlob(m_in, b);
-                        unknown.add(b);
-
-//                        b.blobType = captureBlob(m_in, b);
 //
-//                        if (b.blobType == BlobType.WORM) {
-//                            wormsMats.add(b.contour);
-//                            worms.add(b);
-//                        } else {
-//                            food.add(b);
-//                        }
-
-                        //ROI credit: http://answers.opencv.org/question/497/extract-a-rotatedrect-area/?answer=518#post-id-518
-
-//                    }
-
+//                    Point blobCenter = new Point();
+//                    float[] radiusArr = new float[1];
+//
+//                    Imgproc.minEnclosingCircle(b.mp2f, blobCenter, radiusArr);
+//
+//                    int radius = (int) radiusArr[0];
+//
+//                    int circleArea = (int) (Math.PI * radius * radius);
+//
+//                    //ratio of contour area to minimum enclosing circle area
+//                    float extent = ((float) b.area) / circleArea;
+//
+//                    //likey big blob
+////                    if (extent > 0.6) {
+////                        food.add(b);
+////                    } else {
+//
+//                        b.mat = captureBlob(m_in, b);
+//                        unknown.add(b);
+//
+////                        b.blobType = captureBlob(m_in, b);
+////
+////                        if (b.blobType == BlobType.WORM) {
+////                            wormsMats.add(b.contour);
+////                            worms.add(b);
+////                        } else {
+////                            food.add(b);
+////                        }
+//
+//                        //ROI credit: http://answers.opencv.org/question/497/extract-a-rotatedrect-area/?answer=518#post-id-518
+//
+////                    }
+//
+                    b.mat = captureBlob(m_in, b);
+                    unknown.add(b);
                 } else {
                     //Save this blob
                     food.add(b);
                 }
+
             } else {
                 //This worm is the self
                 selfContour.add(b.contour);
@@ -207,17 +210,14 @@ public class Vision3 {
                 case WORM:
                     worms.add(next);
                     wormsMats.add(next.contour);
-//                    System.out.println("WORM IT");
                     break;
                 case FOOD:
                     foodMats.add(next.contour);
                     food.add(next);
-//                    System.out.println("FOOD IT");
                     break;
                 case PREY:
-//                    System.out.println("PREY IT");
-                    prey.add(next);
                     preyMats.add(next.contour);
+                    prey.add(next);
                     break;
             }
         }

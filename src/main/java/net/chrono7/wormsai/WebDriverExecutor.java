@@ -24,11 +24,11 @@ import static org.apache.commons.io.FileUtils.writeStringToFile;
 
 public class WebDriverExecutor {
 
-    private static final int PIXELS_RIGHT = 20;
-    private static final int PIXELS_LEFT = 30;
-    private static final int PIXELS_DOWN = 110;
-    private static final int PIXELS_UP = 120;
-    private static final Dimension WINDOW_SIZE = new Dimension(1920, 1080);
+    public static final int PIXELS_RIGHT = 20;
+    public static final int PIXELS_LEFT = 30;
+    public static final int PIXELS_DOWN = 110;
+    public static final int PIXELS_UP = 120;
+    public static final Dimension WINDOW_SIZE = new Dimension(1920, 1080);
     private ChromeDriver driver;
     private WebElement game;
     private Robot robot;
@@ -42,21 +42,18 @@ public class WebDriverExecutor {
         proxy.blacklistRequests("http://slither.io/s/gbg.jpg", 204);
         //Finish setting up your driver
 
-        try {
-            Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe");
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
-            public void run() {
-                proxy.stop();
-                driver.close();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            proxy.stop();
+            driver.close();
 //                service.stop();
-                System.exit(0);
-            }
-        });
+            System.exit(0);
+        }));
 
         System.setProperty("webdriver.chrome.driver", "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\drivers\\chromedriver.exe");
 
@@ -243,11 +240,14 @@ public class WebDriverExecutor {
         robot.mouseMove((int) point.getX() + tl.x, (int) point.getY() + tl.y);
     }
 
-    public void fixLoss() {
+    public boolean fixLoss() {
+        boolean lossDetected = false;
         try {
             WebElement play = driver.findElementByXPath("/html[1]/body[1]/div[2]/div[5]/div[1]/div[1]/div[3]");
 
             play.click();
+
+            lossDetected = true;
 
             Thread.sleep(1000);
 
@@ -255,7 +255,9 @@ public class WebDriverExecutor {
             ad.click();
 
         } catch (Exception e) {
-
+            return lossDetected;
         }
+
+        return true;
     }
 }

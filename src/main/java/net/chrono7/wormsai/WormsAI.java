@@ -22,9 +22,11 @@ import java.util.stream.Collectors;
 
 public class WormsAI {
 
+    public static final String STATES_CAPTURE_DIRECTORY = "D:\\Documents\\wormsStates\\images\\";
+    public static final String STATES_CAPTURE_FILE = "D:\\Documents\\wormsStates\\quality.txt";
     private static final int REFRESH_DELAY = 100;
-    public static final String CAPTURE_DIRECTORY = "D:\\Documents\\wormImages\\";
-    private static final int SCORE_WINDOW = 30;
+    private static final int SCORE_WINDOW = 10;
+    //    private static ArrayList<VisionStateReduced> states = new ArrayList<>();
     private static ArrayList<VisionStateReduced> states = new ArrayList<>();
     private static Vision3 vision;
     private static ImgHashBase hashAlgo;
@@ -37,6 +39,7 @@ public class WormsAI {
     public static void main(String[] args) throws AWTException {
 
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+
 
         try {
             vision = new Vision3();
@@ -70,12 +73,13 @@ public class WormsAI {
         long stepStartTime;
 
         try {
-            while (states.size() < 400) {
+            while (steps < 400) {
+//            while (true) {
                 stepStartTime = System.currentTimeMillis();
-                steps++;
-                BufferedImage capture = webExe.getScreenshot();
 
-//                String name = String.valueOf(System.currentTimeMillis());
+                webExe.fixLoss();
+
+                BufferedImage capture = webExe.getScreenshot();
 
                 VisionState vs = vision.process(capture);
 
@@ -83,40 +87,27 @@ public class WormsAI {
 
                 imageLabel.setIcon(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
 
-//                System.out.println(we.getScore());
-
                 Mat hashed = new Mat(vs.mat.rows(), vs.mat.cols(), CvType.CV_8UC3, Scalar.all(0));
                 hashAlgo.compute(vs.mat, hashed);
 
                 vs.mouseLoc = MouseInfo.getPointerInfo().getLocation();
                 vs.boosting = mouseListener.isMousePressed();
-
-//                vs.name = name;
-                vs.hash = hashed;
-
                 vs.score = webExe.getScore();
 
-                updateScore(vs);
+                VisionStateReduced vsr = new VisionStateReduced(vs);
 
-//                if (states.size() == 100) {
-//                    target = vs;
-//
-//                    states.forEach(s -> s.difference = hashAlgo.compare(target.hash, s.hash));
-//
-//                    states.sort(Comparator.comparingDouble(s -> s.difference));
-//
-//                    states.forEach(s -> System.out.println("Name: " + s.name + " | diff: " + s.difference));
-//
-//                    Imgcodecs.imwrite(CAPTURE_DIRECTORY + "target.png", target.mat);
-//                    Imgcodecs.imwrite(CAPTURE_DIRECTORY + "nearest.png", states.get(0).mat);
-//
-//                    break;
-//                } else {
-//                    states.add(vs);
-//                }
+                vsr.hash = hashed;
+
+//                Imgcodecs.imwrite(STATES_CAPTURE_DIRECTORY + "\\" + vs.captureTime + ".png", vs.mat);
+
+//                ImageIO.write(capture, "png",
+//                        new File(STATES_CAPTURE_DIRECTORY + "\\" + vsr.captureTime + ".png"));
+
+                updateScore(vsr);
 
                 delayStep(stepStartTime);
 
+                steps++;
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -124,6 +115,31 @@ public class WormsAI {
         engageAI();
 
     }
+//
+//    private static void writeStateValues() {
+//
+//        try {
+//
+//            StringBuilder sb = new StringBuilder();
+//
+//            //FORMAT: time x y boosting quality
+//            for (VisionStateReduced vs : states) {
+//                sb.append(vs.captureTime).append(" ").append(vs.mouseLoc.x).append(" ").append(vs.mouseLoc.y).append(" ")
+//                        .append(vs.boosting).append(" ").append(vs.quality).append("\n");
+//            }
+//
+//            FileWriter fw = new FileWriter(STATES_CAPTURE_FILE, true);
+//
+//            fw.write(sb.toString());
+//            fw.flush();
+//            fw.close();
+//
+//            states.clear();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+//    }
 
     private static void setupFrame(VisionState vs) {
         if (frame == null) {
@@ -156,9 +172,7 @@ public class WormsAI {
 
                 stepStartTime = System.currentTimeMillis();
 
-                if (steps % 4 == 0) {
-                    webExe.fixLoss();
-                }
+                webExe.fixLoss();
 
                 if (steps % 100 == 0) { //Do state reduction
                     doStateReduction();
@@ -211,7 +225,7 @@ public class WormsAI {
                 vs.mouseLoc = point;
                 vs.boosting = boost;
 
-                updateScore(vs);
+                updateScore(new VisionStateReduced(vs));
 
                 steps++;
                 delayStep(stepStartTime);
@@ -224,34 +238,35 @@ public class WormsAI {
 
     private static void doStateReduction() {
         int sizeBefore = states.size();
-        states.removeIf(s -> Math.abs(s.quality) < 5);
+        states.removeIf(s -> Math.abs(s.quality) < 3);
         System.out.println("Pruned: " + (sizeBefore - states.size()));
 
         sizeBefore = states.size();
 
-        ArrayList<VisionStateReduced> combined = new ArrayList<>(states.size());
+//        ArrayList<VisionStateReduced> combined = new ArrayList<>(states.size());
 
-        states.forEach(s -> combined.add(VisionStateReduced.clone(s)));
+//        states.forEach(s -> combined.add(VisionStateReduced.clone(s)));
 
-        for (int i = 0; i < states.size(); i++) {
-            for (int j = i + 1; j < states.size(); j++) {
-                if (hashAlgo.compare(states.get(i).hash, states.get(j).hash) < 5) {
-                    VisionStateReduced newVSR = states.get(i).quality > states.get(j).quality ?
-                            VisionStateReduced.clone(states.get(i)) : VisionStateReduced.clone(states.get(j));
-//                    newVSR.quality = (states.get(i).quality + states.get(j).quality) / 2;
-                    combined.add(newVSR);
-                    combined.remove(states.get(i));
-                    combined.remove(states.get(j));
-                }
-            }
-        }
+//        for (int i = 0; i < states.size(); i++) {
+//            for (int j = i + 1; j < states.size(); j++) {
+//                if (hashAlgo.compare(states.get(i).hash, states.get(j).hash) < 5) {
+//                    VisionStateReduced newVSR = states.get(i).quality > states.get(j).quality ?
+//                            VisionStateReduced.clone(states.get(i)) : VisionStateReduced.clone(states.get(j));
+////                    newVSR.quality = (states.get(i).quality + states.get(j).quality) / 2;
+//                    combined.add(newVSR);
+//                    combined.remove(states.get(i));
+//                    combined.remove(states.get(j));
+//                }
+//            }
+//        }
 
-        states = combined;
-        System.out.println("Combined: " + (sizeBefore - states.size()));
-        System.out.println("States: " + states.size());
+//        states = combined;
+//        System.out.println("Combined: " + (sizeBefore - states.size()));
+//        System.out.println("States: " + states.size());
     }
 
-    private static void updateScore(VisionState vs) {
+    //    private static void updateScore(VisionState vs) {
+    private static void updateScore(VisionStateReduced vs) {
         if (states.size() > SCORE_WINDOW) {
 
             int statesAgo = 1;
@@ -264,7 +279,8 @@ public class WormsAI {
             }
         }
 
-        states.add(new VisionStateReduced(vs));
+//        states.add(new VisionStateReduced(vs));
+        states.add(vs);
 
 //        printScores();
     }

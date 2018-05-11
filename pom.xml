@@ -2,103 +2,101 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
+    <!-- Group-ID, artifact ID and version of the project. You can modify these as you want -->
     <groupId>net.bvoter</groupId>
-    <artifactId>worms-ai</artifactId>
+    <artifactId>WormsAI</artifactId>
     <version>0.0.1</version>
     <packaging>pom</packaging>
 
-
+    <!-- Properties Section. Change DL4J and ND4J versions here, if required -->
     <properties>
-        <!-- Change the nd4j.backend property to nd4j-cuda-8.0-platform, nd4j-cuda-9.0-platform or nd4j-cuda-9.1-platform to use CUDA GPUs -->
-        <!--<nd4j.backend>nd4j-native-platform</nd4j.backend>-->
-        <nd4j.backend>nd4j-cuda-9.1-platform</nd4j.backend>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <shadedClassifier>bin</shadedClassifier>
-
-
-        <java.version>1.8</java.version>
-        <nd4j.version>1.0.0-alpha</nd4j.version>
         <dl4j.version>1.0.0-alpha</dl4j.version>
-        <datavec.version>1.0.0-alpha</datavec.version>
-        <arbiter.version>1.0.0-alpha</arbiter.version>
-        <rl4j.version>1.0.0-alpha</rl4j.version>
-
-        <!-- For Spark examples: change the _1 to _2 to switch between Spark 1 and Spark 2 -->
-        <dl4j.spark.version>1.0.0-alpha_spark_1</dl4j.spark.version>
-        <datavec.spark.version>1.0.0-alpha_spark_1</datavec.spark.version>
-
-        <!-- Scala binary version: DL4J's Spark and UI functionality are released with both Scala 2.10 and 2.11 support -->
-        <scala.binary.version>2.11</scala.binary.version>
-
-        <hadoop.version>2.2.0</hadoop.version>  <!-- Hadoop version used by Spark 1.6.3 and 2.2.1 (and likely others) -->
-        <guava.version>19.0</guava.version>
-        <logback.version>1.1.7</logback.version>
-        <jfreechart.version>1.0.13</jfreechart.version>
-        <jcommon.version>1.0.23</jcommon.version>
-        <maven-compiler-plugin.version>3.6.1</maven-compiler-plugin.version>
+        <nd4j.version>1.0.0-alpha</nd4j.version>
+        <logback.version>1.2.3</logback.version>
+        <java.version>1.8</java.version>
         <maven-shade-plugin.version>2.4.3</maven-shade-plugin.version>
-        <exec-maven-plugin.version>1.4.0</exec-maven-plugin.version>
-        <maven.minimum.version>3.3.1</maven.minimum.version>
-        <javafx.version>2.2.3</javafx.version>
-        <!--<javafx.runtime.lib.jar>${env.JAVAFX_HOME}/jfxrt.jar</javafx.runtime.lib.jar>-->
-        <aws.sdk.version>1.11.109</aws.sdk.version>
-        <jackson.version>2.6.6</jackson.version>
-        <scala.plugin.version>3.2.2</scala.plugin.version>
+        <scala.binary.version>2.11</scala.binary.version>
     </properties>
 
-    <modelVersion>4.0.0</modelVersion>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version>
-                <configuration>
-                    <source>8</source>
-                    <target>8</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 
     <dependencies>
 
-        <!-- ND4J backend. You need one in every DL4J project. Normally define artifactId as either "nd4j-native-platform" or "nd4j-cuda-7.5-platform" -->
         <dependency>
-            <groupId>org.nd4j</groupId>
-            <artifactId>${nd4j.backend}</artifactId>
-            <version>${nd4j.version}</version>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>25.0-jre</version>
         </dependency>
 
-        <!-- Copy this into your own projects (without the comment block around it), for CPU operations-->
-        <!--
         <dependency>
-            <groupId>org.nd4j</groupId>
-            <artifactId>nd4j-native-platform</artifactId>
-            <version>${nd4j.version}</version>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>3.12.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>net.lightbody.bmp</groupId>
+            <artifactId>browsermob-core</artifactId>
+            <version>2.1.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.6</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.25</version>
+            <!--<scope>test</scope>-->
+        </dependency>
+
+
+
+        <!-- deeplearning4j-core: contains main functionality and neural networks -->
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>deeplearning4j-core</artifactId>
+            <version>${dl4j.version}</version>
+        </dependency>
+
+        <!--
+        ND4J backend: every project needs one of these. The backend defines the hardware on which network training
+        will occur. "nd4j-native-platform" is for CPUs only (for running on all operating systems).
         -->
+        <!--<dependency>-->
+        <!--<groupId>org.nd4j</groupId>-->
+        <!--<artifactId>nd4j-native-platform</artifactId>-->
+        <!--<version>${nd4j.version}</version>-->
+        <!--</dependency>-->
 
-        <!-- Copy this into your own projects (without the comment block around it), for CUDA (NVIDIA GPU) operations-->
-        <!--
+        <!-- CUDA: to use GPU for training (CUDA) instead of CPU, uncomment this, and remove nd4j-native-platform -->
+        <!-- Requires CUDA to be installed to use. Change the version (8.0, 9.0, 9.1) to change the CUDA version -->
+
         <dependency>
             <groupId>org.nd4j</groupId>
             <artifactId>nd4j-cuda-9.1-platform</artifactId>
             <version>${nd4j.version}</version>
         </dependency>
-        -->
-        <dependency>
-            <groupId>org.nd4j</groupId>
-            <artifactId>nd4j-cuda-9.1-platform</artifactId>
-            <version>${nd4j.version}</version>
-        </dependency>
+
+
+        <!-- Optional, but recommended: if you use CUDA, also use CuDNN. To use this, CuDNN must also be installed -->
+        <!-- See: https://deeplearning4j.org/cudnn -->
 
         <dependency>
             <groupId>org.deeplearning4j</groupId>
             <artifactId>deeplearning4j-cuda-9.1</artifactId>
             <version>${dl4j.version}</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>deeplearning4j-parallel-wrapper_2.11</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -107,21 +105,112 @@
             <version>${logback.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.deeplearning4j</groupId>
+            <artifactId>deeplearning4j-ui_${scala.binary.version}</artifactId>
+            <version>${dl4j.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!--<dependency>-->
+        <!--<groupId>org.deeplearning4j</groupId>-->
+        <!--<artifactId>deeplearning4j-play_2.11</artifactId>-->
+        <!--<version>${dl4j.version}</version>-->
+        <!--</dependency>-->
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.0.3</version>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
-    <repositories>
-        <repository>
-            <id>snapshots-repo</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>daily</updatePolicy>  <!-- Optional, update daily -->
-            </snapshots>
-        </repository>
-    </repositories>
+
+    <build>
+        <plugins>
+            <!-- Maven compiler plugin: compile for Java 8 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <archive>
+                        <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+                    </archive>
+                </configuration>
+            </plugin>
+
+
+            <!--
+            Maven shade plugin configuration: this is required so that if you build a single JAR file (an "uber-jar")
+            it will contain all the required native libraries, and the backends will work correctly.
+            Used for example when running the following commants
+
+            mvn package
+            cd target
+            java -cp deeplearning4j-examples-1.0.0-alpha-bin.jar org.deeplearning4j.LenetMnistExample
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <configuration>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                    <shadedClassifierName>bin</shadedClassifierName>
+                    <createDependencyReducedPom>true</createDependencyReducedPom>
+                    <filters>
+                        <filter>
+                            <artifact>*:*</artifact>
+                            <excludes>
+                                <exclude>org/datanucleus/**</exclude>
+                                <exclude>META-INF/*.SF</exclude>
+                                <exclude>META-INF/*.DSA</exclude>
+                                <exclude>META-INF/*.RSA</exclude>
+                            </excludes>
+                        </filter>
+                    </filters>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>reference.conf</resource>
+                                </transformer>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
