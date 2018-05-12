@@ -95,7 +95,7 @@
 
         <dependency>
             <groupId>org.deeplearning4j</groupId>
-            <artifactId>deeplearning4j-parallel-wrapper_2.11</artifactId>
+            <artifactId>deeplearning4j-parallel-wrapper_${scala.binary.version}</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 

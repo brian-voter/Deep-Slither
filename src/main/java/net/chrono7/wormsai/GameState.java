@@ -1,27 +1,40 @@
 package net.chrono7.wormsai;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
+import org.nd4j.linalg.api.ndarray.INDArray;
 
 public class GameState {
 
-    public final BufferedImage img;
-    public Point mouseLoc;
-    public boolean boosting;
-    public int score;
-    public int quality;
+    public final INDArray img;
     public final long captureTime = System.currentTimeMillis();
+    public final int stepIndex;
+    public int actionIndex;
+    public int score = Integer.MIN_VALUE;
+    public int reward = Integer.MIN_VALUE;
 
-    public GameState(BufferedImage img) {
+    public GameState(INDArray img, int stepIndex) {
         this.img = img;
+        this.stepIndex = stepIndex;
     }
 
-    public GameState(BufferedImage img, Point mouseLoc, boolean boosting, int score) {
-
+    public GameState(INDArray img, int stepIndex, int actionIndex, int score, int reward) {
         this.img = img;
-        this.mouseLoc = mouseLoc;
-        this.boosting = boosting;
+        this.actionIndex = actionIndex;
         this.score = score;
+        this.reward = reward;
+        this.stepIndex = stepIndex;
+    }
+
+    public GameState augment(int actionIndex, int score, int reward) {
+        this.actionIndex = actionIndex;
+        if (this.score == Integer.MIN_VALUE) {
+            this.score = score;
+        }
+
+        if (this.reward == Integer.MIN_VALUE) {
+            this.reward = reward;
+        }
+
+        return this;
     }
 
 }

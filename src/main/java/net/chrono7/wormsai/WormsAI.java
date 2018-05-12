@@ -2,50 +2,42 @@ package net.chrono7.wormsai;
 
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
-import org.opencv.core.*;
-import org.opencv.highgui.HighGui;
-import org.opencv.img_hash.ColorMomentHash;
-import org.opencv.img_hash.ImgHashBase;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.imgproc.Moments;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.opencv.core.Core;
 
-import javax.swing.*;
+import javax.imageio.ImageIO;
 import java.awt.*;
-import java.awt.Point;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 public class WormsAI {
 
-    public static final String STATES_CAPTURE_DIRECTORY = "D:\\Documents\\wormsStates\\images\\";
-    public static final String STATES_CAPTURE_FILE = "D:\\Documents\\wormsStates\\quality.txt";
     private static final int REFRESH_DELAY = 100;
-    private static final int SCORE_WINDOW = 10;
-    //    private static ArrayList<VisionStateReduced> states = new ArrayList<>();
-    private static ArrayList<VisionStateReduced> states = new ArrayList<>();
-    private static Vision3 vision;
-    private static ImgHashBase hashAlgo;
+    private static final double EXPLORE_ODDS = 0.005; // epsilon
+    private static final int EXPLORE_STEPS = 20;
+    private static final int MIN_STEP_FOR_NET = 50;
+    private static final int DEATH_BUFFER = 15;
+    private static final int TRAIN_EVERY_N_STEPS = 3;
+    private static ArrayList<GameState> states = new ArrayList<>();
     private static WebDriverExecutor webExe;
-    private static int steps = 0;
+    private static int step = 0;
+    private static int stepOfLastDeath = -1;
     private static MouseListener mouseListener = new MouseListener();
-    private static JFrame frame;
-    private static JLabel imageLabel;
+    private static NeuralNet4 net;
+    private static Random rng = new Random();
+    private static int exploreUntilStep = -1;
+    private static int exploreInstruction = -1;
 
-    public static void main(String[] args) throws AWTException {
+    public static void main(String[] args) {
 
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
-
-        try {
-            vision = new Vision3();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        net = new NeuralNet4();
 
         registerMouseListener();
 
@@ -53,6 +45,7 @@ public class WormsAI {
         webExe.navigate();
 
         captureLoop();
+        engageAI();
     }
 
     private static void registerMouseListener() {
@@ -66,92 +59,6 @@ public class WormsAI {
         Logger.getLogger(GlobalScreen.class.getPackage().getName()).setLevel(Level.SEVERE);
     }
 
-    private static void captureLoop() {
-
-        hashAlgo = ColorMomentHash.create();
-
-        long stepStartTime;
-
-        try {
-            while (steps < 400) {
-//            while (true) {
-                stepStartTime = System.currentTimeMillis();
-
-                webExe.fixLoss();
-
-                BufferedImage capture = webExe.getScreenshot();
-
-                VisionState vs = vision.process(capture);
-
-                setupFrame(vs);
-
-                imageLabel.setIcon(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
-
-                Mat hashed = new Mat(vs.mat.rows(), vs.mat.cols(), CvType.CV_8UC3, Scalar.all(0));
-                hashAlgo.compute(vs.mat, hashed);
-
-                vs.mouseLoc = MouseInfo.getPointerInfo().getLocation();
-                vs.boosting = mouseListener.isMousePressed();
-                vs.score = webExe.getScore();
-
-                VisionStateReduced vsr = new VisionStateReduced(vs);
-
-                vsr.hash = hashed;
-
-//                Imgcodecs.imwrite(STATES_CAPTURE_DIRECTORY + "\\" + vs.captureTime + ".png", vs.mat);
-
-//                ImageIO.write(capture, "png",
-//                        new File(STATES_CAPTURE_DIRECTORY + "\\" + vsr.captureTime + ".png"));
-
-                updateScore(vsr);
-
-                delayStep(stepStartTime);
-
-                steps++;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        engageAI();
-
-    }
-//
-//    private static void writeStateValues() {
-//
-//        try {
-//
-//            StringBuilder sb = new StringBuilder();
-//
-//            //FORMAT: time x y boosting quality
-//            for (VisionStateReduced vs : states) {
-//                sb.append(vs.captureTime).append(" ").append(vs.mouseLoc.x).append(" ").append(vs.mouseLoc.y).append(" ")
-//                        .append(vs.boosting).append(" ").append(vs.quality).append("\n");
-//            }
-//
-//            FileWriter fw = new FileWriter(STATES_CAPTURE_FILE, true);
-//
-//            fw.write(sb.toString());
-//            fw.flush();
-//            fw.close();
-//
-//            states.clear();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//
-//    }
-
-    private static void setupFrame(VisionState vs) {
-        if (frame == null) {
-            frame = new JFrame("WormsAI");
-            frame.setSize(vs.mat.width(), vs.mat.height());
-            frame.setLocation(-1900, 500);
-            frame.setVisible(true);
-            imageLabel = new JLabel(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
-            frame.add(imageLabel);
-        }
-    }
-
     private static void delayStep(long stepStartTime) throws InterruptedException {
         long stepFinishTime;
         stepFinishTime = System.currentTimeMillis();
@@ -159,6 +66,64 @@ public class WormsAI {
         if (stepStartTime + REFRESH_DELAY > stepFinishTime) {
             Thread.sleep(stepStartTime + REFRESH_DELAY - stepFinishTime);
         }
+    }
+
+    private static void captureLoop() {
+        try {
+            while (step < 500) {
+
+                BufferedImage capture = webExe.getScreenshot();
+
+                if (webExe.testLoss()) { // Do training if we lost
+                    System.out.println("LOSS");
+
+                    for (int i = states.size() - 1; i > states.size() - 10; i--) {
+                        states.get(i).reward = -100;
+                    }
+
+                    ImageIO.write(capture, "png",
+                            new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\out.png"));
+
+                    stepOfLastDeath = step;
+                    webExe.fixLoss();
+                    Thread.sleep(1000);
+                }
+
+                INDArray img = NeuralNet4.loader.asMatrix(capture);
+                net.scaleImg(img);
+
+                GameState gs = new GameState(img, step);
+                states.add(gs);
+
+                int actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
+                        mouseListener.isMousePressed());
+
+                GameInstruction action = Directions.getInstruction(actionIndex);
+
+                int scorePre = webExe.getScore();
+
+                System.out.println(action.point + " " + action.boost);
+
+//                delayStep(stepStartTime); // "do the action"
+                Thread.sleep(REFRESH_DELAY);
+
+                int scorePost = webExe.getScore();
+
+                gs.augment(actionIndex, scorePost, scorePost - scorePre);
+
+                if (step > MIN_STEP_FOR_NET && step % TRAIN_EVERY_N_STEPS == 0) {
+//                    train();
+                    train2();
+                }
+
+                step++;
+
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        engageAI();
     }
 
     private static void engageAI() {
@@ -172,63 +137,63 @@ public class WormsAI {
 
                 stepStartTime = System.currentTimeMillis();
 
-                webExe.fixLoss();
-
-                if (steps % 100 == 0) { //Do state reduction
-                    doStateReduction();
-                }
-
                 BufferedImage capture = webExe.getScreenshot();
 
-                VisionState vs = vision.process(capture);
+                if (webExe.testLoss()) { // Do training if we lost
+                    System.out.println("LOSS");
 
-                imageLabel.setIcon(new ImageIcon(HighGui.toBufferedImage(vs.mat)));
-
-                Mat hashed = new Mat(new Size(vs.mat.rows(), vs.mat.cols()), CvType.CV_8UC3, Scalar.all(0));
-                hashAlgo.compute(vs.mat, hashed);
-                vs.score = webExe.getScore();
-                vs.hash = hashed;
-
-                Point point = null;
-                boolean boost = false;
-
-                if (vs.worms.size() == 0 && vs.prey.size() == 0) {
-                    if (vs.food.size() > 0) {
-                        try {
-                            Blob max = vs.food.stream().max(Comparator.comparingDouble(c ->
-                                    c.area * (1.0 / c.distanceFromCenter))).get();
-
-                            Moments moments = Imgproc.moments(max.contour);
-
-                            org.openqa.selenium.Point tl = webExe.getTopLeftPoint();
-                            point = new Point((int) (moments.m10 / moments.m00) + tl.x,
-                                    (int) (moments.m01 / moments.m00) + tl.y);
-                        } catch (NullPointerException e) {
-                            System.out.println("null max " + steps);
-                        }
+                    for (int i = states.size() - 1; i > states.size() - 5; i--) {
+                        states.get(i).reward = 0;
                     }
-                } else {
-                    VisionStateReduced best = states.stream().sorted(Comparator.comparingDouble(s ->
-                            hashAlgo.compare(hashed, s.hash))).limit(10).sorted(Comparator.comparingDouble(s -> s.quality))
-                            .collect(Collectors.toList()).get(0);
 
-                    point = best.mouseLoc;
-                    boost = best.boosting;
+                    for (int i = states.size() - 5; i > states.size() - DEATH_BUFFER; i--) {
+                        states.get(i).reward = -100;
+                    }
+
+                    ImageIO.write(capture, "png",
+                            new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\out.png"));
+
+//                    if (step > MIN_STEP_FOR_NET && step - stepOfLastDeath > 20) {
+//
+//                        //TODO: DO MASKING on outputs not trained
+//                        train();
+//                    }
+
+                    stepOfLastDeath = step;
+                    webExe.fixLoss();
+                    Thread.sleep(1000);
                 }
 
-                if (point != null) {
-                    webExe.point(point);
+                INDArray img = NeuralNet4.loader.asMatrix(capture);
+                net.scaleImg(img);
+
+                GameState gs = new GameState(img, step);
+                states.add(gs);
+
+                int actionIndex = selectAction(gs);
+
+                GameInstruction action = Directions.getInstruction(actionIndex);
+
+                int scorePre = webExe.getScore();
+
+                System.out.println(action + (step < exploreUntilStep ? " exploring" : " net"));
+
+                webExe.pointAdjusted(action.point);
+                webExe.setBoost(action.boost);
+
+//                delayStep(stepStartTime); // "do the action"
+                Thread.sleep(REFRESH_DELAY);
+
+                int scorePost = webExe.getScore();
+
+                gs.augment(actionIndex, scorePost, scorePost - scorePre);
+
+                if (step > MIN_STEP_FOR_NET && step % TRAIN_EVERY_N_STEPS == 0) {
+//                    train();
+                    train2();
                 }
 
-                webExe.setBoost(boost);
-
-                vs.mouseLoc = point;
-                vs.boosting = boost;
-
-                updateScore(new VisionStateReduced(vs));
-
-                steps++;
-                delayStep(stepStartTime);
+                step++;
 
             }
         } catch (Exception e) {
@@ -236,70 +201,67 @@ public class WormsAI {
         }
     }
 
-    private static void doStateReduction() {
-        int sizeBefore = states.size();
-        states.removeIf(s -> Math.abs(s.quality) < 3);
-        System.out.println("Pruned: " + (sizeBefore - states.size()));
+    private static void train2() {
+        int numExamples = 20;
 
-        sizeBefore = states.size();
+        ArrayList<GameState> examples = new ArrayList<>(numExamples);
 
-//        ArrayList<VisionStateReduced> combined = new ArrayList<>(states.size());
-
-//        states.forEach(s -> combined.add(VisionStateReduced.clone(s)));
-
-//        for (int i = 0; i < states.size(); i++) {
-//            for (int j = i + 1; j < states.size(); j++) {
-//                if (hashAlgo.compare(states.get(i).hash, states.get(j).hash) < 5) {
-//                    VisionStateReduced newVSR = states.get(i).quality > states.get(j).quality ?
-//                            VisionStateReduced.clone(states.get(i)) : VisionStateReduced.clone(states.get(j));
-////                    newVSR.quality = (states.get(i).quality + states.get(j).quality) / 2;
-//                    combined.add(newVSR);
-//                    combined.remove(states.get(i));
-//                    combined.remove(states.get(j));
-//                }
-//            }
-//        }
-
-//        states = combined;
-//        System.out.println("Combined: " + (sizeBefore - states.size()));
-//        System.out.println("States: " + states.size());
-    }
-
-    //    private static void updateScore(VisionState vs) {
-    private static void updateScore(VisionStateReduced vs) {
-        if (states.size() > SCORE_WINDOW) {
-
-            int statesAgo = 1;
-
-            int changeInScore = vs.score - states.get(states.size() - 1).score;
-
-            for (int i = states.size() - 1; i >= states.size() - SCORE_WINDOW; i--) {
-                states.get(i).quality += changeInScore * ((SCORE_WINDOW - statesAgo + 1.0) / SCORE_WINDOW);
-                statesAgo++;
-            }
+        for (int i = 0; i < numExamples; i++) {
+            examples.add(states.get(
+                    rng.nextInt(states.size() - DEATH_BUFFER) + DEATH_BUFFER - 1));
         }
 
-//        states.add(new VisionStateReduced(vs));
-        states.add(vs);
-
-//        printScores();
+        System.out.println("on " + examples.size() + " examples");
+        net.train(examples);
+        System.out.println("TRAINING COMPLETE");
     }
 
-    private static void printScores() {
+    private static void train() {
+        System.out.println("TRAINING");
+        int numExamples = Math.min((step - stepOfLastDeath) * 4, 1000);
 
-        final int printWindow = 20;
+        ArrayList<GameState> examples = new ArrayList<>(numExamples);
 
-        System.out.println("SCORE: " + states.get(states.size() - 1).score);
-
-        if (states.size() > printWindow) {
-            int startIdx = states.size() - printWindow;
-            StringBuilder scoreString = new StringBuilder(String.valueOf(states.get(startIdx).quality));
-            for (int i = startIdx + 1; i < states.size(); i++) {
-                scoreString.append(", ").append(states.get(i).quality);
-            }
-            System.out.println(scoreString.toString() + "\n");
+        for (int i = 0; i < numExamples; i++) {
+            examples.add(states.get(
+                    rng.nextInt(states.size() - NeuralNet4.STACK_HEIGHT) + NeuralNet4.STACK_HEIGHT - 1));
         }
 
+        System.out.println("on " + examples.size() + " examples");
+        net.train(examples);
+        System.out.println("TRAINING COMPLETE");
+    }
+
+    private static int selectAction(GameState state) {
+        if (step <= exploreUntilStep) { // Keep exploring
+            return exploreInstruction;
+        } else {
+            if (rng.nextDouble() < EXPLORE_ODDS || step < MIN_STEP_FOR_NET) { // Start exploring
+                exploreUntilStep = step + EXPLORE_STEPS;
+                exploreInstruction = Directions.randomIndex();
+                return exploreInstruction;
+
+            } else { // Use network
+                return net.process(state);
+            }
+        }
+    }
+
+    /**
+     * Gets the image for the state at the specified step, along with the previous numStacked images stacked below.
+     *
+     * @param step       The step number for the topmost image state
+     * @param numStacked The total number of image states to stack. Should be at least one.
+     * @return The stacked image
+     */
+    public static INDArray getStackedImg(int step, int numStacked) {
+        INDArray[] arr = new INDArray[numStacked];
+
+        for (int i = 0; i < numStacked; i++) {
+            arr[i] = (states.get(step - i).img);
+        }
+
+        return Nd4j.concat(1, arr);
     }
 
 }

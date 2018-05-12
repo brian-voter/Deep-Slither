@@ -11,6 +11,9 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.CapabilityType;
 
+import javax.imageio.ImageIO;
+import java.util.Collections;
+import java.util.List;
 import java.awt.*;
 import java.awt.Rectangle;
 import java.awt.event.InputEvent;
@@ -18,16 +21,15 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 
 import static org.apache.commons.io.FileUtils.writeStringToFile;
 
 public class WebDriverExecutor {
 
-    public static final int PIXELS_RIGHT = 20;
-    public static final int PIXELS_LEFT = 30;
-    public static final int PIXELS_DOWN = 110;
-    public static final int PIXELS_UP = 120;
+    public static final int PIXELS_RIGHT = 5;
+    public static final int PIXELS_LEFT = 35;
+    public static final int PIXELS_DOWN = 80;
+    public static final int PIXELS_UP = 110;
     public static final Dimension WINDOW_SIZE = new Dimension(1920, 1080);
     private ChromeDriver driver;
     private WebElement game;
@@ -105,11 +107,22 @@ public class WebDriverExecutor {
 
     public void navigate() {
         driver.manage().window().setSize(WINDOW_SIZE);
+        driver.manage().window().setPosition(new Point(0,0));
         driver.get("http://slither.io");
-        WebElement e = driver.findElement(By.id("nick"));
 
         delay(2000);
 
+        game = driver.findElement(By.cssSelector("body"));
+
+        BufferedImage capture = getScreenshot();
+        try {
+            ImageIO.write(capture, "png",
+                    new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\out.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+//        WebElement e = driver.findElement(By.id("nick"));
 //        e.sendKeys("TEST-301");
 
 //        delay(1000);
@@ -124,12 +137,11 @@ public class WebDriverExecutor {
         }
         delay(5000);
 
-        game = driver.findElement(By.cssSelector("body"));
 
 
         //todo: don't filter out the game (canvas)?
 
-        String[] elementsToHide = new String[] {"/html/body/div[9]", "/html/body/div[10]",
+        String[] elementsToHide = new String[]{"/html/body/div[9]", "/html/body/div[10]",
                 "/html/body/div[11]", "/html/body/div[12]", "/html/body/div[13]",
                 "/html/body/div[15]"};
 
@@ -148,12 +160,12 @@ public class WebDriverExecutor {
     public void setBoost(boolean boost) {
         if (boost) {
             robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-        }else {
+        } else {
             robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
         }
     }
 
-    private int attemptScoreRetrieval() throws StaleElementReferenceException{
+    private int attemptScoreRetrieval() throws StaleElementReferenceException {
         return Integer.valueOf(driver.findElementByXPath("/html[1]/body[1]/div[13]/span[1]/span[2]")
                 .getAttribute("textContent"));
     }
@@ -164,13 +176,13 @@ public class WebDriverExecutor {
         int attempts = 0;
 
         while (!retrieved) {
-            try{
+            try {
                 score = attemptScoreRetrieval();
                 retrieved = true;
-            } catch (StaleElementReferenceException e){
+            } catch (StaleElementReferenceException e) {
                 attempts++;
 
-                if (attempts > 10){
+                if (attempts > 10) {
                     throw new StaleElementReferenceException("Failed to retrieve score after 10 attempts.");
                 }
             }
@@ -240,6 +252,24 @@ public class WebDriverExecutor {
         robot.mouseMove((int) point.getX() + tl.x, (int) point.getY() + tl.y);
     }
 
+    /**
+     * @return true if the game ended and has not yet been restarted, false otherwise
+     */
+    public boolean testLoss() {
+        List<WebElement> elem = driver.findElementsByXPath("/html[1]/body[1]/div[2]/div[5]/div[1]/div[1]/div[3]");
+
+        if (elem.size() == 0) {
+            return false;
+        }
+
+        return elem.get(0).isDisplayed();
+    }
+
+    /**
+     * Restarts the game if it has ended. Does nothing otherwise.
+     *
+     * @return true if the game ended and is being restarted, false otherwise
+     */
     public boolean fixLoss() {
         boolean lossDetected = false;
         try {
