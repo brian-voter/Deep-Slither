@@ -1,12 +1,15 @@
 package net.chrono7.wormsai;
 
+import java.util.Random;
+
 public class Util {
 
-    public static double distance(double a, double b){
-        return Math.sqrt(a*a + b*b);
-    }
+    private static Random rng = new Random();
 
-    public static double distance2(double a, double b){
-        return a*a + b*b;
+    /**
+     * @return a random integer between min [inclusive] and max [exclusive]
+     */
+    public static int rand(int min, int max) {
+        return rng.nextInt(max - min) + min;
     }
 }

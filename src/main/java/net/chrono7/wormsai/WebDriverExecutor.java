@@ -12,8 +12,6 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.CapabilityType;
 
 import javax.imageio.ImageIO;
-import java.util.Collections;
-import java.util.List;
 import java.awt.*;
 import java.awt.Rectangle;
 import java.awt.event.InputEvent;
@@ -21,6 +19,8 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.apache.commons.io.FileUtils.writeStringToFile;
 
@@ -107,7 +107,7 @@ public class WebDriverExecutor {
 
     public void navigate() {
         driver.manage().window().setSize(WINDOW_SIZE);
-        driver.manage().window().setPosition(new Point(0,0));
+        driver.manage().window().setPosition(new Point(0, 0));
         driver.get("http://slither.io");
 
         delay(2000);
@@ -129,15 +129,22 @@ public class WebDriverExecutor {
 
         driver.findElement(By.id("grqi")).click();
 
-        WebElement play = driver.findElements(By.className("nsi")).stream()
-                .filter(e1 -> e1.getText().equals(" Play ")).findFirst().orElseGet(null);
+        driver.findElementByXPath("/html/body/div[@id='smh']" + // change skin button
+                "/div[@id='cskh']/a[@id='csk']/img[@class='nsi']").click();
+        delay(500);
 
-        if (play != null) {
-            play.click();
-        }
+        driver.findElementByXPath("/html/body/div[@class='btnt nsi sadg1']" + // save button
+                "[2]/div/div[@class='nsi']").click();
+
+        delay(500);
+//        WebElement play = driver.findElements(By.className("nsi")).stream()
+//                .filter(e1 -> e1.getText().equals(" Play ")).findFirst().orElseGet(null);
+//        play.click();
+
+        driver.findElementByXPath("/html/body/div[@id='login']" + // play button
+                "/div[@id='playh']/div[@class='btnt nsi sadg1']/div/div[@class='nsi']").click();
+
         delay(5000);
-
-
 
         //todo: don't filter out the game (canvas)?
 
@@ -243,12 +250,18 @@ public class WebDriverExecutor {
         return new java.awt.Point(lastMouseX, lastMouseY);
     }
 
+    public java.awt.Point roughly(java.awt.Point point) {
+        return new java.awt.Point(Util.rand(point.x - 2, point.x + 2), Util.rand(point.y - 2, point.y + 2));
+    }
+
     public void point(java.awt.Point point) {
+        point = roughly(point);
         robot.mouseMove((int) point.getX(), (int) point.getY());
     }
 
     public void pointAdjusted(java.awt.Point point) {
         Point tl = getTopLeftPoint();
+        point = roughly(point);
         robot.mouseMove((int) point.getX() + tl.x, (int) point.getY() + tl.y);
     }
 
