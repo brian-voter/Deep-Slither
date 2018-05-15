@@ -146,8 +146,6 @@ public class WebDriverExecutor {
 
         delay(5000);
 
-        //todo: don't filter out the game (canvas)?
-
         String[] elementsToHide = new String[]{"/html/body/div[9]", "/html/body/div[10]",
                 "/html/body/div[11]", "/html/body/div[12]", "/html/body/div[13]",
                 "/html/body/div[15]"};
