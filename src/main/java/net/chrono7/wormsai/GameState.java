@@ -1,18 +1,19 @@
 package net.chrono7.wormsai;
 
-import org.nd4j.linalg.api.ndarray.INDArray;
+import org.bytedeco.javacpp.opencv_core;
+import org.bytedeco.javacv.Frame;
 
 public class GameState {
 
-    public INDArray img;
+    public opencv_core.Mat img;
     public final int stepIndex;
     public int actionIndex;
     public int score = Integer.MIN_VALUE;
     public int reward = Integer.MIN_VALUE;
     public boolean isTerminal = false;
 
-    public GameState(INDArray img, int stepIndex) {
-        this.img = img;
+    public GameState(Frame img, int stepIndex) {
+        this.img = Vision4.shrink(img);
         this.stepIndex = stepIndex;
     }
 

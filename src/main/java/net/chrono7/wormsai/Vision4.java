@@ -2,6 +2,8 @@ package net.chrono7.wormsai;
 
 import org.bytedeco.javacpp.opencv_core;
 import org.bytedeco.javacpp.opencv_core.Mat;
+import org.bytedeco.javacpp.opencv_imgproc;
+import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -57,13 +59,45 @@ public class Vision4 {
         return large;
     }
 
-    public static INDArray process(BufferedImage img) throws IOException {
+    public static INDArray process(Mat m) {
 
-        INDArray arr = NeuralNet4.loader.asMatrix(img, true);
+        try {
+            INDArray arr = NeuralNet4.loader.asMatrix(m);
 
-        NeuralNet4.scaler.transform(arr);
+            NeuralNet4.scaler.transform(arr);
 
-        return arr;
+            return arr;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public static Mat shrink(Frame frame) {
+        Mat m = openCVFrameConverter.convert(frame);
+        Mat m2 = new Mat();
+        opencv_imgproc.resize(m, m2, new opencv_core.Size(NeuralNet4.WIDTH, NeuralNet4.HEIGHT));
+        if (NeuralNet4.CHANNELS == 1) {
+            cvtColor(m2, m2, COLOR_BGR2GRAY);
+        } else if (NeuralNet4.CHANNELS != 3) {
+            throw new RuntimeException("Channels should be 1 or 3!");
+        }
+
+        return m2;
+    }
+
+    public static INDArray process(BufferedImage img) {
+
+        try {
+            INDArray arr = NeuralNet4.loader.asMatrix(img, true);
+            NeuralNet4.scaler.transform(arr);
+            return arr;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
     private static Mat img2Mat(BufferedImage in) {

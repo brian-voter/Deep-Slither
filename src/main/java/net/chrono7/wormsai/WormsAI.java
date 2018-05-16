@@ -1,11 +1,11 @@
 package net.chrono7.wormsai;
 
+import org.bytedeco.javacv.Frame;
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
@@ -16,23 +16,23 @@ public class WormsAI {
 
     public static final double GAMMA = 0.99;
     public static final boolean TRAINING_MODE = true;
-    private static final int NET_DRIVE_AFTER_STEP = 1200;
+    private static final int NET_DRIVE_AFTER_STEP = 10_000;
     private static final boolean USE_HUMAN_START = false;
     private static final int REFRESH_DELAY = 50;
-    private static final int EXPLORE_STEPS = 7;
+    private static final int EXPLORE_STEPS = 5;
     private static final int MIN_STEP_FOR_NET = 500; // MAKE DIVISIBLE BY 10
-    private static final int DEATH_BUFFER = 15;
+    private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 4;
-    private static final int TRAIN_N_EXAMPLES = 40;
-    private static final int CLONE_TARGET_EVERY_N_STEPS = 500;
+    private static final int TRAIN_N_EXAMPLES = 20;
+    private static final int CLONE_TARGET_EVERY_N_STEPS = 1000;
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    private static final double EPSILON_END_STEP = 10_000;
+    private static final double EPSILON_END_STEP = 20_000;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     public static MouseListener mouseListener = new MouseListener();
-    private static StateStore states = new StateStore(10_000);
+    private static StateStore states = new StateStore(20_000);
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;
@@ -46,8 +46,6 @@ public class WormsAI {
 
     public static void main(String[] args) {
 
-//        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-
         net = new NeuralNet4();
 
         registerMouseListener();
@@ -55,11 +53,14 @@ public class WormsAI {
         webExe = new WebDriverExecutor();
         webExe.navigate();
 
+
         try {
             engage();
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+
     }
 
     private static void registerMouseListener() {
@@ -79,7 +80,8 @@ public class WormsAI {
 
         while (true) {
 
-            BufferedImage capture = webExe.getScreenshot();
+            stepStartTime = System.currentTimeMillis();
+            Frame capture = webExe.getScreenshot();
 
             if (webExe.testLoss()) { // Do training if we lost
                 System.out.println("LOSS");
@@ -99,9 +101,8 @@ public class WormsAI {
                 net.save(step);
             }
 
-            stepStartTime = System.currentTimeMillis();
 
-            GameState gs = new GameState(Vision4.process(capture), step);
+            GameState gs = new GameState(capture, step);
             states.add(gs);
 
             drive(gs);
@@ -127,8 +128,6 @@ public class WormsAI {
                 gs.score = scorePost;
                 gs.reward = scorePost - scorePre;
             }
-
-            System.out.println(gs.reward);
 
             prev = gs;
 
@@ -260,13 +259,13 @@ public class WormsAI {
     public static INDArray getStackedImg(GameState gs, int numStacked) {
 
         if (numStacked == 1) {
-            return gs.img;
+            return Vision4.process(gs.img);
         }
 
         INDArray[] arr = new INDArray[numStacked];
 
         for (int i = 0; i < numStacked; i++) {
-            arr[i] = states.get(step - i).img;
+            arr[i] = Vision4.process(states.get(step - i).img);
         }
 
         return Nd4j.concat(1, arr);
