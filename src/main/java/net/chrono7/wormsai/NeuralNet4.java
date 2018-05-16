@@ -184,6 +184,13 @@ public class NeuralNet4 {
         return output.argMax(1).getInt(0);
     }
 
+    private INDArray predictBestAction(INDArray inputs) {
+
+        INDArray output = net.outputSingle(false, inputs);
+
+        return output.argMax(1);
+    }
+
     private double predictQValue(GameState gs) {
 
         INDArray arr = WormsAI.getStackedImg(gs, STACK_HEIGHT);
@@ -195,6 +202,20 @@ public class NeuralNet4 {
         return output.getDouble(bestAction);
     }
 
+    private INDArray predictQValue(INDArray inputs) {
+        INDArray bestActions = predictBestAction(inputs); // [inputs.rows x 1] the best action index
+
+        INDArray output = targetNet.outputSingle(false, inputs); //[inputs.rows x nActions] the Q vals for each action
+
+        INDArray ret = Nd4j.zeros(inputs.rows(), 1);
+
+        for (int row = 0; row < ret.rows(); row++) {
+            ret.put(row, 0, output.getScalar(row, bestActions.getInt(row, 0)));
+        }
+
+        return ret;
+    }
+
     public void train(Collection<GameState> gameStates) {
 
         Iterator<GameState> iterator = gameStates.iterator();
@@ -203,19 +224,43 @@ public class NeuralNet4 {
         LinkedList<INDArray> labelLst = new LinkedList<>();
         LinkedList<INDArray> labelMaskLst = new LinkedList<>();
 
+        INDArray inputs = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
+        INDArray nextInputs = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
+        INDArray labelMask = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
+        INDArray nextRewards = Nd4j.zeros(gameStates.size(), 1);
+        INDArray nextNotTerminal = Nd4j.zeros(gameStates.size(), 1);
+
         GameState gs;
+        int row = 0;
         while (iterator.hasNext()) {
             gs = iterator.next();
-            inputLst.add(WormsAI.getStackedImg(gs, STACK_HEIGHT));
-            labelLst.add(oneOn(Directions.numInstructions, gs.actionIndex, Q_val(gs), 0));
-            labelMaskLst.add(oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
+            GameState ns = WormsAI.getNext(gs);
+            inputs.putRow(row, WormsAI.getStackedImg(gs, STACK_HEIGHT));
+            nextInputs.putRow(row, WormsAI.getStackedImg(ns, STACK_HEIGHT));
+            labelMask.putRow(row, oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
+            nextRewards.put(row, 0, ns.reward);
+            nextNotTerminal.put(row, 0, !ns.isTerminal ? 1 : 0);
         }
 
-        INDArray labels = Nd4j.vstack(labelLst);
+        INDArray labels = Q_Val(nextRewards, nextInputs, nextNotTerminal);
+
+//        while (iterator.hasNext()) {
+//            gs = iterator.next();
+//            inputLst.add(WormsAI.getStackedImg(gs, STACK_HEIGHT));
+//            labelLst.add(oneOn(Directions.numInstructions, gs.actionIndex, Q_val(gs), 0));
+//            labelMaskLst.add(oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
+//        }
+
+//        INDArray labels = Nd4j.vstack(labelLst);
 
 //        rewardScaler.transform(labels);
 
         net.fit(new INDArray[]{Nd4j.vstack(inputLst)}, new INDArray[]{labels}, null, new INDArray[]{Nd4j.vstack(labelMaskLst)});
+    }
+
+    private INDArray Q_Val(INDArray nextRewards, INDArray nextInputs, INDArray nextNotTerminal) {
+        INDArray gammaQ = predictQValue(nextInputs).mul(WormsAI.GAMMA).mul(nextNotTerminal);
+        return nextRewards.add(gammaQ);
     }
 
     private double Q_val(GameState gs) {
