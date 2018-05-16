@@ -5,8 +5,12 @@ import java.util.Random;
 
 public class Directions {
 
-    private static final int[] xVals = new int[]{10, 314, 628, 942, 1256, 1570, 1870};
-    private static final int[] yVals = new int[]{10, 160, 320, 480, 640, 800, 960};
+    public static final boolean RELATIVE = true;
+    private static final int[] relativeXVals = new int[]{-100, 0, 100};
+    private static final int[] relativeYVals = new int[]{-100, 0, 100};
+    private static final boolean[] boostVals = new boolean[]{false};
+    private static final int[] xVals = new int[]{10, 628, 1256, 1870};
+    private static final int[] yVals = new int[]{10, 320, 640, 960};
     private static final GameInstruction[] instructions = generateInstructions();
     public static final int numInstructions = instructions.length;
     private static Random rng = new Random();
@@ -20,26 +24,42 @@ public class Directions {
     }
 
     private static GameInstruction[] generateInstructions() {
-        GameInstruction[] instructions = new GameInstruction[2 * 2 * xVals.length + 2 * 2 * yVals.length];
+        if (RELATIVE) {
+            GameInstruction[] instructions = new GameInstruction[relativeXVals.length * relativeYVals.length * boostVals.length];
 
-        int i = 0;
-        for (int x : xVals) {
-            instructions[i++] = new GameInstruction(new Point(x, yVals[0]), false);
-            instructions[i++] = new GameInstruction(new Point(x, yVals[0]), true);
-            instructions[i++] = new GameInstruction(new Point(x, yVals[yVals.length - 1]), false);
-            instructions[i++] = new GameInstruction(new Point(x, yVals[yVals.length - 1]), true);
+            int i = 0;
+            for (int x : relativeXVals) {
+                for (int y : relativeYVals) {
+                    for (boolean b : boostVals) {
+                        instructions[i++] = new GameInstruction(new Point(x, y), b);
+                    }
+                }
+            }
+
+            return instructions;
+        } else {
+            GameInstruction[] instructions = new GameInstruction[2 * 2 * xVals.length + 2 * 2 * yVals.length];
+
+            int i = 0;
+            for (int x : xVals) {
+                instructions[i++] = new GameInstruction(new Point(x, yVals[0]), false);
+                instructions[i++] = new GameInstruction(new Point(x, yVals[0]), true);
+                instructions[i++] = new GameInstruction(new Point(x, yVals[yVals.length - 1]), false);
+                instructions[i++] = new GameInstruction(new Point(x, yVals[yVals.length - 1]), true);
+            }
+
+            for (int y : yVals) {
+                instructions[i++] = new GameInstruction(new Point(xVals[0], y), false);
+                instructions[i++] = new GameInstruction(new Point(xVals[0], y), true);
+                instructions[i++] = new GameInstruction(new Point(xVals[xVals.length - 1], y), false);
+                instructions[i++] = new GameInstruction(new Point(xVals[xVals.length - 1], y), true);
+            }
+
+            return instructions;
         }
-
-        for (int y : yVals) {
-            instructions[i++] = new GameInstruction(new Point(xVals[0], y), false);
-            instructions[i++] = new GameInstruction(new Point(xVals[0], y), true);
-            instructions[i++] = new GameInstruction(new Point(xVals[xVals.length - 1], y), false);
-            instructions[i++] = new GameInstruction(new Point(xVals[xVals.length - 1], y), true);
-        }
-
-        return instructions;
     }
 
+    @Deprecated
     public static int getClosest(Point location, boolean boosting) {
         int minIdx = -1;
         double min = Integer.MAX_VALUE;

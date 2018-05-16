@@ -1,8 +1,7 @@
 package net.chrono7.wormsai;
 
-import org.datavec.image.loader.NativeImageLoader;
+import org.datavec.image.loader.Java2DNativeImageLoader;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
-import org.deeplearning4j.nn.conf.ConvolutionMode;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.inputs.InputType;
@@ -15,9 +14,7 @@ import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
-import org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
 
@@ -26,16 +23,16 @@ import java.util.*;
 
 public class NeuralNet4 {
 
-    public static final int STACK_HEIGHT = 2; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
+    public static final int STACK_HEIGHT = 1; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
     private static final int WIDTH = 200;
     private static final int HEIGHT = 100;
     private static final int CHANNELS = 1; // 3 for RGB, 1 for grayscale ??
-    public static final NativeImageLoader loader = new NativeImageLoader(HEIGHT, WIDTH, CHANNELS);
+    public static final Java2DNativeImageLoader loader = new Java2DNativeImageLoader(HEIGHT, WIDTH, CHANNELS);
     private MultiLayerNetwork net;
     private MultiLayerNetwork targetNet;
     private Random rng = new Random();
-    private NormalizerMinMaxScaler rewardScaler = new NormalizerMinMaxScaler();
+//    private NormalizerMinMaxScaler rewardScaler = new NormalizerMinMaxScaler();
 
     public NeuralNet4() {
         net = buildNet();
@@ -46,13 +43,13 @@ public class NeuralNet4 {
 
         net.addListeners(new ScoreIterationListener(10));
 
-        DataSet rewardFit = new DataSet();
+//        DataSet rewardFit = new DataSet();
 
-        INDArray rewardArr = Nd4j.vstack(Nd4j.create(Directions.numInstructions).assign(-100),
-                Nd4j.create(Directions.numInstructions).assign(100));
+//        INDArray rewardArr = Nd4j.vstack(Nd4j.create(Directions.numInstructions).assign(-10),
+//                Nd4j.create(Directions.numInstructions).assign(150));
 
-        rewardFit.setFeatures(rewardArr);
-        rewardScaler.fit(rewardFit);
+//        rewardFit.setFeatures(rewardArr);
+//        rewardScaler.fit(rewardFit);
     }
 
     public static INDArray pileSelf(INDArray arr, int times) {
@@ -87,20 +84,16 @@ public class NeuralNet4 {
                 .seed(rng.nextLong())
 //                .l2(0.005)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .convolutionMode(ConvolutionMode.Same)
                 .activation(Activation.RELU)
-                .weightInit(WeightInit.RELU)
-                .updater(new Adam(0.00025))
+                .weightInit(WeightInit.XAVIER)
+//                .updater(new RmsProp(0.00025, 0.95, 0.01))
+                .updater(new Adam(0.0001))
                 .list()
                 .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(32).build())
-//                .layer(new LocalResponseNormalization.Builder().build())
-//                .layer(new SubsamplingLayer.Builder(3, 3).stride(2, 2).build())
-                .layer(new ConvolutionLayer.Builder(4, 4).stride(2, 2).nOut(64).build())
-                .layer(new ConvolutionLayer.Builder(3, 3).stride(1, 1).nOut(64).build())
-//                .layer(new SubsamplingLayer.Builder(3, 3).stride(2, 2).build())
-                .layer(new DenseLayer.Builder().nOut(600).build())
-//                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MEAN_ABSOLUTE_ERROR)
-                .layer(new OutputLayer.Builder(new HuberLoss())
+                .layer(new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(64).build())
+                .layer(new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(64).build())
+                .layer(new DenseLayer.Builder().nOut(512).build())
+                .layer(new OutputLayer.Builder(new LogCoshLoss())
                         .nOut(Directions.numInstructions)
                         .activation(Activation.IDENTITY)
                         .build())
@@ -123,13 +116,20 @@ public class NeuralNet4 {
         return net;
     }
 
-    public int process(GameState state, boolean print) {
-        return process(WormsAI.getStackedImg(state.stepIndex, STACK_HEIGHT), print);
+    /**
+     * Returns the index of the action predicted to be "best" given the state arr.
+     *
+     * @param state The game state
+     * @param print Set to true to print the predicted Q values for each action
+     * @return the index of the best action
+     */
+    public int predictBestAction(GameState state, boolean print) {
+        return predictBestAction(WormsAI.getStackedImg(state, STACK_HEIGHT), print);
     }
 
-    public int process(INDArray arr, boolean print) {
+    private int predictBestAction(INDArray arr, boolean print) {
 
-        INDArray output = net.output(arr);
+        INDArray output = net.output(arr, false);
 
         if (print) {
             System.out.println(output);
@@ -138,16 +138,15 @@ public class NeuralNet4 {
         return output.argMax(1).getInt(0);
     }
 
-    private double predictTarget(GameState gs) {
+    private double predictQValue(GameState gs) {
 
-        INDArray arr = WormsAI.getStackedImg(gs.stepIndex, STACK_HEIGHT);
+        INDArray arr = WormsAI.getStackedImg(gs, STACK_HEIGHT);
 
-        int bestAction = process(gs, false);
+        int bestAction = predictBestAction(arr, false);
 
-        INDArray vals = targetNet.output(arr, false, null,
-                oneOn(Directions.numInstructions, bestAction, 1, 0));
+        INDArray output = targetNet.output(arr, false);
 
-        return vals.getDouble(bestAction);
+        return output.getDouble(bestAction);
     }
 
     public void train(Collection<GameState> gameStates) {
@@ -155,27 +154,27 @@ public class NeuralNet4 {
         Iterator<GameState> iterator = gameStates.iterator();
 
         LinkedList<INDArray> inputLst = new LinkedList<>();
-        LinkedList<INDArray> outputLst = new LinkedList<>();
-        LinkedList<INDArray> outputMaskLst = new LinkedList<>();
+        LinkedList<INDArray> labelLst = new LinkedList<>();
+        LinkedList<INDArray> labelMaskLst = new LinkedList<>();
 
         GameState gs;
         while (iterator.hasNext()) {
             gs = iterator.next();
-            inputLst.add(WormsAI.getStackedImg(gs.stepIndex, STACK_HEIGHT));
-            outputLst.add(oneOn(Directions.numInstructions, gs.actionIndex, Q_val(gs), 0));
-            outputMaskLst.add(oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
+            inputLst.add(WormsAI.getStackedImg(gs, STACK_HEIGHT));
+            labelLst.add(oneOn(Directions.numInstructions, gs.actionIndex, Q_val(gs), 0));
+            labelMaskLst.add(oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
         }
 
-        INDArray output = Nd4j.vstack(outputLst);
+        INDArray labels = Nd4j.vstack(labelLst);
 
-//        rewardScaler.transform(output);
+//        rewardScaler.transform(labels);
 
-        net.fit(Nd4j.vstack(inputLst), output, null, Nd4j.vstack(outputMaskLst));
+        net.fit(Nd4j.vstack(inputLst), labels, null, Nd4j.vstack(labelMaskLst));
     }
 
     private double Q_val(GameState gs) {
         GameState next = WormsAI.getNext(gs);
-        return gs.reward + WormsAI.GAMMA * (next.isTerminal ? 0 : predictTarget(WormsAI.getNext(gs)));
+        return next.reward + WormsAI.GAMMA * (next.isTerminal ? 0 : predictQValue(next));
     }
 
     public void save(int step) {
