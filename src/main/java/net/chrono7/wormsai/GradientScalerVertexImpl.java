@@ -45,8 +45,8 @@ public class GradientScalerVertexImpl extends BaseGraphVertex {
                     return inputs[0].dup();
 //                case 3:
 //                    return this.inputs[0].get(new INDArrayIndex[]{NDArrayIndex.all(), NDArrayIndex.interval(this.from, this.to, true), NDArrayIndex.all()});
-//                case 4:
-//                    return this.inputs[0].get(new INDArrayIndex[]{NDArrayIndex.all(), NDArrayIndex.interval(this.from, this.to, true), NDArrayIndex.all(), NDArrayIndex.all()});
+                case 4:
+                    return inputs[0].dup();
                 default:
                     throw new UnsupportedOperationException("Cannot get subset for activations of rank " + this.inputs[0].rank());
             }
@@ -65,9 +65,9 @@ public class GradientScalerVertexImpl extends BaseGraphVertex {
 //                case 3:
 //                    out.put(new INDArrayIndex[]{NDArrayIndex.all(), NDArrayIndex.interval(this.from, this.to, true), NDArrayIndex.all()}, this.epsilon);
 //                    break;
-//                case 4:
-//                    out.put(new INDArrayIndex[]{NDArrayIndex.all(), NDArrayIndex.interval(this.from, this.to, true), NDArrayIndex.all(), NDArrayIndex.all()}, this.epsilon);
-//                    break;
+                case 4:
+                    out = epsilon.dup().div(Math.sqrt(2));
+                    break;
                 default:
                     throw new RuntimeException("Invalid activation rank");
             }

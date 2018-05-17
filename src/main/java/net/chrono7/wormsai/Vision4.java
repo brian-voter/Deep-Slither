@@ -78,6 +78,7 @@ public class Vision4 {
         Mat m = openCVFrameConverter.convert(frame);
         Mat m2 = new Mat();
         opencv_imgproc.resize(m, m2, new opencv_core.Size(NeuralNet4.WIDTH, NeuralNet4.HEIGHT));
+        threshold(m2, m2, THRESHOLD, 255, THRESH_BINARY);
         if (NeuralNet4.CHANNELS == 1) {
             cvtColor(m2, m2, COLOR_BGR2GRAY);
         } else if (NeuralNet4.CHANNELS != 3) {

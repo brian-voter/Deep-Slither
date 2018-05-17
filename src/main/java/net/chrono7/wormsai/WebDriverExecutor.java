@@ -277,9 +277,14 @@ public class WebDriverExecutor {
      * @return true if the game ended and is being restarted, false otherwise
      */
     public boolean fixLoss() {
+
+        robot.mouseMove((int) gameRect.getCenterX(), (int) gameRect.getCenterY());
+        robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+
         boolean lossDetected = false;
         try {
             WebElement play = driver.findElementByXPath("/html[1]/body[1]/div[2]/div[5]/div[1]/div[1]/div[3]");
+
 
             play.click();
 

@@ -1,9 +1,11 @@
 package net.chrono7.wormsai;
 
 import org.datavec.image.loader.Java2DNativeImageLoader;
+import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.distribution.NormalDistribution;
 import org.deeplearning4j.nn.conf.graph.ElementWiseVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
@@ -13,16 +15,21 @@ import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
+import org.deeplearning4j.ui.api.UIServer;
+import org.deeplearning4j.ui.stats.StatsListener;
+import org.deeplearning4j.ui.storage.InMemoryStatsStorage;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
-import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Random;
 
 public class NeuralNet4 {
 
@@ -45,6 +52,11 @@ public class NeuralNet4 {
         cloneTarget();
 
         net.addListeners(new ScoreIterationListener(10));
+
+        UIServer uiServer = UIServer.getInstance();
+        StatsStorage statsStorage = new InMemoryStatsStorage();
+        uiServer.attach(statsStorage);
+        net.addListeners(new StatsListener( statsStorage),new ScoreIterationListener(1));
 
 //        DataSet rewardFit = new DataSet();
 
@@ -84,22 +96,25 @@ public class NeuralNet4 {
 
     private ComputationGraph buildNet() {
 
-        ComputationGraphConfiguration confG = new NeuralNetConfiguration.Builder()
+        ComputationGraphConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(rng.nextLong())
 //                .l2(0.005)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .activation(Activation.RELU)
-                .weightInit(WeightInit.XAVIER)
+                .weightInit(WeightInit.DISTRIBUTION)
+                .dist(new NormalDistribution(0.0025, 0.01))
 //                .updater(new RmsProp(0.00025, 0.95, 0.01))
-                .updater(new Adam(0.00025))
+                .updater(new Adam(0.0001))
                 .graphBuilder()
                 .addInputs("input")
-                .addLayer("c1", new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(32).build(), "input")
-                .addLayer("c2", new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(64).build(), "c1")
-                .addLayer("c3", new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(64).build(), "c2")
+                .addLayer("c1", new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build(), "input")
+                .addLayer("c2", new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(32).build(), "c1")
+                .addLayer("c3", new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(32).build(), "c2")
+                .addVertex("gradScaler", new GradientScalerVertex(), "c3")
+                //TODO: normalize gradient here???
 
                 // SPLIT - Advantage
-                .addLayer("advantageDense", new DenseLayer.Builder().nOut(512).build(), "c3")
+                .addLayer("advantageDense", new DenseLayer.Builder().nOut(512).build(), "gradScaler")
                 .addLayer("advantageOut", new DenseLayer.Builder().nOut(Directions.numInstructions).build(), "advantageDense")
                 .addVertex("advantageAverage", new AverageVertex(), "advantageOut")
                 .addVertex("advantageRepeat", new RepeatVertex(Directions.numInstructions), "advantageAverage")
@@ -108,14 +123,14 @@ public class NeuralNet4 {
 
                 // SPLIT - Value
 
-                .addLayer("valueDense", new DenseLayer.Builder().nOut(512).build(), "c3")
+                .addLayer("valueDense", new DenseLayer.Builder().nOut(128).build(), "gradScaler")
                 .addLayer("valueOut", new DenseLayer.Builder().nOut(1).build(), "valueDense")
                 .addVertex("valueRepeat", new RepeatVertex(Directions.numInstructions), "valueOut")
 
 
-                .addVertex("add", new ElementWiseVertex(ElementWiseVertex.Op.Add),"advantageSubtr", "valueRepeat")
-                .addLayer("output", new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
-//                        .addLayer("output", new OutputLayer.Builder(new LogCoshLoss())
+                .addVertex("add", new ElementWiseVertex(ElementWiseVertex.Op.Add), "advantageSubtr", "valueRepeat")
+//                .addLayer("output", new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
+                        .addLayer("output", new OutputLayer.Builder(new LogCoshLoss())
                         .nOut(Directions.numInstructions)
                         .activation(Activation.IDENTITY)
                         .build(), "add")
@@ -123,7 +138,6 @@ public class NeuralNet4 {
                 .setInputTypes(InputType.convolutional(HEIGHT, WIDTH, STACK_HEIGHT))
                 .backprop(true).pretrain(false)
                 .build();
-//                .add
 
 
 //        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
@@ -132,13 +146,16 @@ public class NeuralNet4 {
 //                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
 //                .activation(Activation.RELU)
 //                .weightInit(WeightInit.XAVIER)
+////                .weightInit(WeightInit.DISTRIBUTION)
+////                .dist(new NormalDistribution(0.0025, 0.01))
 ////                .updater(new RmsProp(0.00025, 0.95, 0.01))
-//                .updater(new Adam(0.0001))
+//                .updater(new Adam(0.00025))
+////                .updater(new RmsProp(0.00025, 0.95, 0.01))
 //                .list()
-//                .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(32).build())
-//                .layer(new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(64).build())
-//                .layer(new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(64).build())
-//                .layer(new DenseLayer.Builder().nOut(512).build())
+//                .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build())
+//                .layer(new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(32).build())
+//                .layer(new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(32).build())
+//                .layer(new DenseLayer.Builder().nOut(256).build())
 //                .layer(new OutputLayer.Builder(new LogCoshLoss())
 //                        .nOut(Directions.numInstructions)
 //                        .activation(Activation.IDENTITY)
@@ -147,7 +164,7 @@ public class NeuralNet4 {
 //                .setInputType(InputType.convolutional(HEIGHT, WIDTH, STACK_HEIGHT))
 //                .build();
 
-        return new ComputationGraph(confG);
+        return new ComputationGraph(conf);
     }
 
     private MultiLayerNetwork loadNet() {
@@ -184,9 +201,10 @@ public class NeuralNet4 {
         return output.argMax(1).getInt(0);
     }
 
-    private INDArray predictBestAction(INDArray inputs) {
+    //FOR MATRIX
+    private INDArray predictBestAction(INDArray arr) {
 
-        INDArray output = net.outputSingle(false, inputs);
+        INDArray output = net.outputSingle(false, arr);
 
         return output.argMax(1);
     }
@@ -202,12 +220,13 @@ public class NeuralNet4 {
         return output.getDouble(bestAction);
     }
 
-    private INDArray predictQValue(INDArray inputs) {
-        INDArray bestActions = predictBestAction(inputs); // [inputs.rows x 1] the best action index
+    //FOR MATRIX
+    private INDArray predictQValue(INDArray arr) {
+        INDArray bestActions = predictBestAction(arr); // [inputs.rows x 1] the best action index
 
-        INDArray output = targetNet.outputSingle(false, inputs); //[inputs.rows x nActions] the Q vals for each action
+        INDArray output = targetNet.outputSingle(false, arr); //[inputs.rows x nActions] the Q vals for each action
 
-        INDArray ret = Nd4j.zeros(inputs.rows(), 1);
+        INDArray ret = Nd4j.zeros(output.rows(), 1);
 
         for (int row = 0; row < ret.rows(); row++) {
             ret.put(row, 0, output.getScalar(row, bestActions.getInt(row, 0)));
@@ -219,15 +238,15 @@ public class NeuralNet4 {
     public void train(Collection<GameState> gameStates) {
 
         Iterator<GameState> iterator = gameStates.iterator();
+//
+//        LinkedList<INDArray> inputLst = new LinkedList<>();
+//        LinkedList<INDArray> labelLst = new LinkedList<>();
+//        LinkedList<INDArray> labelMaskLst = new LinkedList<>();
 
-        LinkedList<INDArray> inputLst = new LinkedList<>();
-        LinkedList<INDArray> labelLst = new LinkedList<>();
-        LinkedList<INDArray> labelMaskLst = new LinkedList<>();
-
-        INDArray inputs = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
-        INDArray nextInputs = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
+        INDArray inputs = Nd4j.zeros(gameStates.size(), CHANNELS, HEIGHT, WIDTH);
+        INDArray nextInputs = Nd4j.zeros(gameStates.size(), CHANNELS, HEIGHT, WIDTH);
         INDArray labelMask = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
-        INDArray nextRewards = Nd4j.zeros(gameStates.size(), 1);
+        INDArray rewards = Nd4j.zeros(gameStates.size(), 1);
         INDArray nextNotTerminal = Nd4j.zeros(gameStates.size(), 1);
 
         GameState gs;
@@ -238,11 +257,16 @@ public class NeuralNet4 {
             inputs.putRow(row, WormsAI.getStackedImg(gs, STACK_HEIGHT));
             nextInputs.putRow(row, WormsAI.getStackedImg(ns, STACK_HEIGHT));
             labelMask.putRow(row, oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
-            nextRewards.put(row, 0, ns.reward);
+            rewards.put(row, 0, gs.reward);
             nextNotTerminal.put(row, 0, !ns.isTerminal ? 1 : 0);
+            row++;
         }
 
-        INDArray labels = Q_Val(nextRewards, nextInputs, nextNotTerminal);
+
+        INDArray labels = Q_Val(rewards, nextInputs, nextNotTerminal, labelMask);
+//        for (int i = 0; i < labels.rows(); i++) {
+//            System.out.println(labels.getRow(i));
+//        }
 
 //        while (iterator.hasNext()) {
 //            gs = iterator.next();
@@ -255,12 +279,13 @@ public class NeuralNet4 {
 
 //        rewardScaler.transform(labels);
 
-        net.fit(new INDArray[]{Nd4j.vstack(inputLst)}, new INDArray[]{labels}, null, new INDArray[]{Nd4j.vstack(labelMaskLst)});
+        net.fit(new INDArray[]{inputs}, new INDArray[]{labels}, null, new INDArray[]{labelMask});
+//        net.fit(inputs, labels, null, labelMask);
     }
 
-    private INDArray Q_Val(INDArray nextRewards, INDArray nextInputs, INDArray nextNotTerminal) {
-        INDArray gammaQ = predictQValue(nextInputs).mul(WormsAI.GAMMA).mul(nextNotTerminal);
-        return nextRewards.add(gammaQ);
+    private INDArray Q_Val(INDArray rewards, INDArray nextInputs, INDArray nextNotTerminal, INDArray actions) {
+        INDArray gammaQ = predictQValue(nextInputs).muli(WormsAI.GAMMA).muli(nextNotTerminal);
+        return actions.muli(rewards.add(gammaQ));
     }
 
     private double Q_val(GameState gs) {

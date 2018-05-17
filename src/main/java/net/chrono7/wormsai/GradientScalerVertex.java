@@ -25,7 +25,7 @@ public class GradientScalerVertex extends GraphVertex {
         if (!(o instanceof GradientScalerVertex)) {
             return false;
         } else {
-            GradientScalerVertex s = (GradientScalerVertex)o;
+            GradientScalerVertex s = (GradientScalerVertex) o;
             return true;
         }
     }
@@ -54,9 +54,11 @@ public class GradientScalerVertex extends GraphVertex {
         if (vertexInputs.length != 1) {
             throw new InvalidInputTypeException("GradientScalerVertex expects single input type. Received: " + Arrays.toString(vertexInputs));
         } else {
-            switch(vertexInputs[0].getType()) {
+            switch (vertexInputs[0].getType()) {
                 case FF:
                     return InputType.feedForward(vertexInputs[0].arrayElementsPerExample());
+                case CNN:
+                    return vertexInputs[0];
                 default:
                     throw new RuntimeException("Only supports FF");
             }
@@ -65,7 +67,7 @@ public class GradientScalerVertex extends GraphVertex {
 
     public MemoryReport getMemoryReport(InputType... inputTypes) {
         InputType outputType = this.getOutputType(-1, inputTypes);
-        return (new Builder((String)null, GradientScalerVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
+        return (new Builder((String) null, GradientScalerVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
     }
 
     public String toString() {

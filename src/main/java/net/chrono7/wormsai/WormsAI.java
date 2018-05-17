@@ -6,6 +6,7 @@ import org.jnativehook.NativeHookException;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
@@ -20,15 +21,15 @@ public class WormsAI {
     private static final boolean USE_HUMAN_START = false;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    private static final int MIN_STEP_FOR_NET = 500; // MAKE DIVISIBLE BY 10
+    private static final int MIN_STEP_FOR_NET = 500; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
     private static final int DEATH_BUFFER = 20;
-    private static final int TRAIN_EVERY_N_STEPS = 4;
-    private static final int TRAIN_N_EXAMPLES = 20;
-    private static final int CLONE_TARGET_EVERY_N_STEPS = 1000;
+    private static final int TRAIN_EVERY_N_STEPS = 5;
+    private static final int TRAIN_N_EXAMPLES = 40;
+    private static final int CLONE_TARGET_EVERY_N_STEPS = 750;
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    private static final double EPSILON_END_STEP = 20_000;
+    private static final double EPSILON_END_STEP = 50_000;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     public static MouseListener mouseListener = new MouseListener();
@@ -107,7 +108,7 @@ public class WormsAI {
 
             drive(gs);
 
-            if (step >= MIN_STEP_FOR_NET && step % 10 == 0) {
+            if (step >= MIN_STEP_FOR_NET && step % TRAIN_EVERY_N_STEPS == 0) {
                 if (step - stepLastCloned > CLONE_TARGET_EVERY_N_STEPS || step == MIN_STEP_FOR_NET) {
                     net.cloneTarget();
                     stepLastCloned = step;
@@ -155,52 +156,51 @@ public class WormsAI {
             if (step < NET_DRIVE_AFTER_STEP) {
 
                 if (USE_HUMAN_START) {
-                    actionIndex = 0;
-                    //TODO: re-enable human start?
-//                    actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
-//                            mouseListener.isMousePressed());
-                    do_move = false;
-                } else { // Uniform Random driver
-                    actionIndex = getRandomAction();
-                }
+            //TODO: re-enable human start?
+            actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
+                    mouseListener.isMousePressed());
+            do_move = false;
+        } else { // Uniform Random driver
+            actionIndex = getRandomAction();
+        }
 
-            } else { // Sometimes AI Driver
+    } else { // Sometimes AI Driver
 
-                if (step <= exploreUntilStep) { // If in a random period
-                    actionIndex = getRandomAction();
-                } else {
-                    double epsilon = EPSILON_SLOPE * step + EPSILON_START;
-
-                    if (Math.random() < epsilon) { // If starting a random period
-                        actionIndex = getRandomAction();
-                    } else { // AI selects
-                        actionIndex = net.predictBestAction(gs, step % PRINT_FREQUENCY == 0);
-                    }
-                }
-            }
+        if (step <= exploreUntilStep) { // If in a random period
+            actionIndex = getRandomAction();
         } else {
-            actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
-                    net.predictBestAction(gs, step % PRINT_FREQUENCY == 0));
+            double epsilon = EPSILON_SLOPE * step + EPSILON_START;
+
+            if (Math.random() < epsilon) { // If starting a random period
+                actionIndex = getRandomAction();
+            } else { // AI selects
+                actionIndex = net.predictBestAction(gs, step % PRINT_FREQUENCY == 0);
+            }
+        }
+    }
+} else {
+        actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
+        net.predictBestAction(gs, step % PRINT_FREQUENCY == 0));
         }
 
 
         if (do_move) {
-            GameInstruction action = Directions.getInstruction(actionIndex);
-            webExe.act(action);
+        GameInstruction action = Directions.getInstruction(actionIndex);
+        webExe.act(action);
         }
 
         gs.actionIndex = actionIndex;
 
         if (step % PRINT_FREQUENCY == 0) {
-            System.out.println("step: " + step);
+        System.out.println("step: " + step);
         }
-    }
+        }
 
-    private static int getRandomAction() {
+private static int getRandomAction() {
 
         if (step > exploreUntilStep) {
-            exploreUntilStep = step + EXPLORE_STEPS;
-            exploreInstruction = Directions.randomIndex();
+        exploreUntilStep = step + EXPLORE_STEPS;
+        exploreInstruction = Directions.randomIndex();
         }
 
         return exploreInstruction;

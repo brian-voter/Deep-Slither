@@ -5,7 +5,7 @@ import java.util.Random;
 
 public class Directions {
 
-    public static final boolean RELATIVE = true;
+    public static final boolean RELATIVE = false;
     private static final int[] relativeXVals = new int[]{-100, 0, 100};
     private static final int[] relativeYVals = new int[]{-100, 0, 100};
     private static final boolean[] boostVals = new boolean[]{false};
