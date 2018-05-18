@@ -7,6 +7,7 @@ import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.datavec.image.loader.NativeImageLoader;
+import org.nd4j.linalg.api.memory.MemoryWorkspace;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.primitives.Pair;
@@ -121,6 +122,7 @@ public class Vision4 {
 //        return null;
 //    }
 
+    @Deprecated
     public static Mat shrink(Frame frame) {
         if (frame == null) {
             return null;
@@ -144,11 +146,13 @@ public class Vision4 {
             return null;
         }
 
-        try {
-            return NeuralNet4.loader.asMatrix(frame);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            try (MemoryWorkspace ws = Nd4j.getWorkspaceManager().getAndActivateWorkspace(WorkspaceManager.CPU_ID)) {
+                return NeuralNet4.loader.asMatrix(frame);
+                //TODO: assert attached
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
         return null;
     }

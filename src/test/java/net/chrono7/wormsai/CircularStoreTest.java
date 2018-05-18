@@ -6,13 +6,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class StateStoreTest {
+class CircularStoreTest {
 
-    private static StateStore states;
+    private static CircularStore<GameState> states;
 
     @BeforeAll
     static void setUpAll () {
-        states = new StateStore(15_000);
+        states = new CircularStore<>(15_000);
     }
 
     @AfterEach

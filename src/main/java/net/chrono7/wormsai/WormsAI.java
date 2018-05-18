@@ -36,7 +36,8 @@ public class WormsAI {
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     public static MouseListener mouseListener = new MouseListener();
-    private static StateStore states = new StateStore(20_000);
+    private static CircularStore<GameState> states = new CircularStore<>(10_000);
+    private static CircularStore<INDArray> stackBuildingBuffer = new CircularStore<>(NeuralNet4.STACK_HEIGHT - 1);
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;
@@ -104,8 +105,7 @@ public class WormsAI {
                 net.save(step);
             }
 
-            GameState gs = new GameState(capture, step);
-            states.add(gs);
+            GameState gs = processNextState(capture);
 
             drive(gs);
 
@@ -114,7 +114,7 @@ public class WormsAI {
                     net.cloneTarget();
                     stepLastCloned = step;
                 }
-                train(Math.min(states.size(), TRAIN_N_EXAMPLES));
+                train(TRAIN_N_EXAMPLES);
             }
 
             int scorePre = (prev != null && !prev.isTerminal ? prev.score : 10);
@@ -136,6 +136,21 @@ public class WormsAI {
             step++;
 
         }
+    }
+
+    private static GameState processNextState(Frame capture) {
+
+        GameState state;
+        if (NeuralNet4.STACK_HEIGHT == 1) {
+            state = new GameState(Vision4.convert(capture), step);
+        } else {
+            stackBuildingBuffer.add(Vision4.convert(capture));
+            state = new GameState(getStackedImg(), step);
+        }
+
+        states.add(state);
+        return state;
+
     }
 
     private static void delay() throws InterruptedException {
@@ -175,13 +190,13 @@ public class WormsAI {
                     if (Math.random() < epsilon) { // If starting a random period
                         actionIndex = getRandomAction();
                     } else { // AI selects
-                        actionIndex = net.predictBestAction(states.size() - 1, step % PRINT_FREQUENCY == 0);
+                        actionIndex = net.predictBestAction(gs, step % PRINT_FREQUENCY == 0);
                     }
                 }
             }
         } else {
             actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
-                    net.predictBestAction(states.size(), step % PRINT_FREQUENCY == 0));
+                    net.predictBestAction(gs, step % PRINT_FREQUENCY == 0));
         }
 
 
@@ -236,22 +251,26 @@ public class WormsAI {
     }
 
     /**
-     * Gets the image for the state at the specified index, along with the previous (numStacked - 1) images stacked below.
+     * Gets the image for the state at the specified index, along with the previous ({@link NeuralNet4#STACK_HEIGHT} - 1) images stacked below.
+     * Don't use this if numStacked < 2. Be sure to add the latest INDArray to {@link #stackBuildingBuffer} before calling.
      *
-     * @param topIndex   The index in the state store of the topmost state
-     * @param numStacked The total number of image states to stack. Should be at least one.
      * @return The stacked image
      */
-    public static INDArray getStackedImg(int topIndex, int numStacked) {
+    private static INDArray getStackedImg() {
 
-        if (numStacked == 1) {
-            return Vision4.process(states.get(topIndex).img);
-        }
+        INDArray[] arr = new INDArray[NeuralNet4.STACK_HEIGHT];
 
-        INDArray[] arr = new INDArray[numStacked];
+        // edge case where buffer is not yet filled
+        if (stackBuildingBuffer.size() < NeuralNet4.STACK_HEIGHT) {
+            for (int i = 0; i < NeuralNet4.STACK_HEIGHT; i++) {
+                arr[i] = stackBuildingBuffer.get(stackBuildingBuffer.size() - 1);
+            }
 
-        for (int i = 0; i < numStacked; i++) {
-            arr[i] = Vision4.process(states.get(topIndex - i).img);
+        } else {
+            int placeIdx = 0;
+            for (int i = NeuralNet4.STACK_HEIGHT - 1; i >= 0; i--) {
+                arr[placeIdx++] = stackBuildingBuffer.get(i);
+            }
         }
 
         return Nd4j.concat(1, arr); // apparently dimensions are [minibatchSize, channels, height, width]
