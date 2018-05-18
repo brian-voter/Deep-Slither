@@ -6,18 +6,25 @@ import org.bytedeco.javacpp.opencv_imgproc;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
+import org.datavec.image.loader.NativeImageLoader;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.primitives.Pair;
+import org.nd4j.linalg.util.ArrayUtil;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
+import static org.bytedeco.javacpp.opencv_imgcodecs.imwrite;
 import static org.bytedeco.javacpp.opencv_imgproc.*;
 
 public class Vision4 {
     private static final double THRESHOLD = 35;
     private static Java2DFrameConverter java2DFrameConverter = new Java2DFrameConverter();
     private static OpenCVFrameConverter.ToMat openCVFrameConverter = new OpenCVFrameConverter.ToMat();
+    private static Method fillNDArray = null;
 
     public static Pair<Integer, INDArray> processAndCountLargeBlobs(BufferedImage img) throws IOException {
 
@@ -59,28 +66,72 @@ public class Vision4 {
         return large;
     }
 
+
+    /**
+     * Performs unsafe conversion of a Mat of the correct size to an INDArray.
+     * Size needs to match {@link NeuralNet4#WIDTH} and {@link NeuralNet4#HEIGHT} and channels need to be
+     * {@link NeuralNet4#CHANNELS}. Uses reflection and should be faster than {@link NativeImageLoader#asMatrix(Mat)}
+     *
+     * @param m the mat to convert
+     * @return the resulting INDArray
+     */
     public static INDArray process(Mat m) {
 
+        if (fillNDArray == null) {
+            Class loader = NativeImageLoader.class;
+            try {
+                fillNDArray = loader.getDeclaredMethod("fillNDArray", Mat.class, INDArray.class);
+                fillNDArray.setAccessible(true);
+            } catch (NoSuchMethodException e) {
+                e.printStackTrace();
+            }
+        }
+
+//         INDArray arr = NeuralNet4.loader.asMatrix(m);
+        INDArray ret = Nd4j.create(m.channels(), m.rows(), m.cols());
+
         try {
-            INDArray arr = NeuralNet4.loader.asMatrix(m);
-
-            NeuralNet4.scaler.transform(arr);
-
-            return arr;
-        } catch (IOException e) {
+            fillNDArray.invoke(NeuralNet4.loader, m, ret);
+            m.data(); // dummy call to make sure it does not get deallocated prematurely
+        } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
         }
 
-        return null;
+        ret.reshape(ArrayUtil.combine(new int[][]{{1}, ret.shape()}));
+
+        imwrite("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\out.png", NeuralNet4.loader.asMat(ret));
+
+        NeuralNet4.scaler.transform(ret);
+
+        return ret;
     }
 
+
+//    public static INDArray process(Mat m) {
+//
+//        try {
+//            INDArray arr = NeuralNet4.loader.asMatrix(m);
+//            NeuralNet4.scaler.transform(arr);
+//            return arr;
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+//
+//        return null;
+//    }
+
     public static Mat shrink(Frame frame) {
+        if (frame == null) {
+            return null;
+        }
+
         Mat m = openCVFrameConverter.convert(frame);
         Mat m2 = new Mat();
         opencv_imgproc.resize(m, m2, new opencv_core.Size(NeuralNet4.WIDTH, NeuralNet4.HEIGHT));
-        threshold(m2, m2, THRESHOLD, 255, THRESH_BINARY);
+//        threshold(m2, m2, THRESHOLD, 255, THRESH_BINARY);
         if (NeuralNet4.CHANNELS == 1) {
-            cvtColor(m2, m2, COLOR_BGR2GRAY);
+            cvtColor(m2, m2, CV_BGR2GRAY);
         } else if (NeuralNet4.CHANNELS != 3) {
             throw new RuntimeException("Channels should be 1 or 3!");
         }
@@ -88,12 +139,13 @@ public class Vision4 {
         return m2;
     }
 
-    public static INDArray process(BufferedImage img) {
+    public static INDArray convert(Frame frame) {
+        if (frame == null) {
+            return null;
+        }
 
         try {
-            INDArray arr = NeuralNet4.loader.asMatrix(img, true);
-            NeuralNet4.scaler.transform(arr);
-            return arr;
+            return NeuralNet4.loader.asMatrix(frame);
         } catch (IOException e) {
             e.printStackTrace();
         }

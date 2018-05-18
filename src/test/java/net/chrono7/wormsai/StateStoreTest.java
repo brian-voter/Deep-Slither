@@ -4,11 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.NoSuchElementException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-class statesTest {
+class StateStoreTest {
 
     private static StateStore states;
 
@@ -27,7 +25,7 @@ class statesTest {
         states.add(new GameState(null, 0), new GameState(null, 1),
                 new GameState(null, 2), new GameState(null, 3));
 
-        assertEquals(states.getSize(), 4);
+        assertEquals(states.size(), 4);
 
         states.applyToLastElements(s -> s.reward = 7, 2);
         assertEquals(states.get(0).reward, Integer.MIN_VALUE);
@@ -56,24 +54,20 @@ class statesTest {
 
     @Test
     void add() {
-        assertEquals(states.getSize(), 0);
+        assertEquals(states.size(), 0);
         states.add(new GameState(null, 0));
-        assertEquals(states.getSize(), 1);
-
-        assertThrows(IllegalArgumentException.class, () -> states.add(new GameState(null, 0)));
+        assertEquals(states.size(), 1);
 
         states.clear();
-        assertEquals(states.getSize(), 0);
+        assertEquals(states.size(), 0);
 
         for (int i = 0; i < states.capacity; i++) {
             states.add(new GameState(null, i));
         }
-        assertEquals(states.getSize(), states.capacity);
+        assertEquals(states.size(), states.capacity);
 
         states.add(new GameState(null, states.capacity + 1));
-        assertEquals(states.getSize(), states.capacity);
-        assertEquals(states.getFirstIndex(), 1);
-        assertEquals(states.getLastIndex(), states.capacity + 1);
+        assertEquals(states.size(), states.capacity);
 
     }
 
@@ -82,12 +76,10 @@ class statesTest {
         for (int i = 0; i < 10; i++) {
             states.add(new GameState(null, i));
         }
-        assertEquals(states.getSize(), 10);
+        assertEquals(states.size(), 10);
 
         states.clear();
 
-        assertEquals(states.getSize(), 0);
-        assertThrows(NoSuchElementException.class, () -> states.getFirstIndex());
-        assertThrows(NoSuchElementException.class, () -> states.getLastIndex());
+        assertEquals(states.size(), 0);
     }
 }

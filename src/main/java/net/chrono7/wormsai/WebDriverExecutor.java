@@ -234,10 +234,10 @@ public class WebDriverExecutor {
         return new Point(game.getLocation().getX() + PIXELS_RIGHT, game.getLocation().getY() + PIXELS_DOWN);
     }
 
-    public Point getCenterPoint() {
-        return new Point((game.getLocation().getX() + PIXELS_RIGHT + game.getSize().width - PIXELS_LEFT) / 2,
-                (game.getLocation().getY() + PIXELS_DOWN + (game.getSize().height - PIXELS_UP) / 2));
-    }
+//    public Point getCenterPoint() {
+//        return new Point((game.getLocation().getX() + PIXELS_RIGHT + game.getSize().width - PIXELS_LEFT) / 2,
+//                (game.getLocation().getY() + PIXELS_DOWN + (game.getSize().height - PIXELS_UP) / 2));
+//    }
 
     public java.awt.Point getMousePoint() {
         return new java.awt.Point(lastMouseX, lastMouseY);

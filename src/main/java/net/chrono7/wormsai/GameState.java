@@ -6,6 +6,7 @@ import org.bytedeco.javacv.Frame;
 public class GameState {
 
     public opencv_core.Mat img;
+    @Deprecated
     public final int stepIndex;
     public int actionIndex;
     public int score = Integer.MIN_VALUE;

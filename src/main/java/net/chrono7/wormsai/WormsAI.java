@@ -17,19 +17,22 @@ public class WormsAI {
 
     public static final double GAMMA = 0.99;
     public static final boolean TRAINING_MODE = true;
-    private static final int NET_DRIVE_AFTER_STEP = 10_000;
+    //    private static final int NET_DRIVE_AFTER_STEP = 10_000;
+    private static final int NET_DRIVE_AFTER_STEP = 200;
     private static final boolean USE_HUMAN_START = false;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    private static final int MIN_STEP_FOR_NET = 500; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    //    private static final int MIN_STEP_FOR_NET = 5000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
     private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 5;
-    private static final int TRAIN_N_EXAMPLES = 40;
+    private static final int TRAIN_N_EXAMPLES = 35;
     private static final int CLONE_TARGET_EVERY_N_STEPS = 750;
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    private static final double EPSILON_END_STEP = 50_000;
+    //    private static final double EPSILON_END_STEP = 75_000;
+    private static final double EPSILON_END_STEP = 500;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     public static MouseListener mouseListener = new MouseListener();
@@ -60,7 +63,6 @@ public class WormsAI {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
 
     }
 
@@ -102,7 +104,6 @@ public class WormsAI {
                 net.save(step);
             }
 
-
             GameState gs = new GameState(capture, step);
             states.add(gs);
 
@@ -113,7 +114,7 @@ public class WormsAI {
                     net.cloneTarget();
                     stepLastCloned = step;
                 }
-                train(Math.min(states.getSize(), TRAIN_N_EXAMPLES));
+                train(Math.min(states.size(), TRAIN_N_EXAMPLES));
             }
 
             int scorePre = (prev != null && !prev.isTerminal ? prev.score : 10);
@@ -156,119 +157,104 @@ public class WormsAI {
             if (step < NET_DRIVE_AFTER_STEP) {
 
                 if (USE_HUMAN_START) {
-            //TODO: re-enable human start?
-            actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
-                    mouseListener.isMousePressed());
-            do_move = false;
-        } else { // Uniform Random driver
-            actionIndex = getRandomAction();
-        }
+                    //TODO: re-enable human start?
+                    actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
+                            mouseListener.isMousePressed());
+                    do_move = false;
+                } else { // Uniform Random driver
+                    actionIndex = getRandomAction();
+                }
 
-    } else { // Sometimes AI Driver
+            } else { // Sometimes AI Driver
 
-        if (step <= exploreUntilStep) { // If in a random period
-            actionIndex = getRandomAction();
-        } else {
-            double epsilon = EPSILON_SLOPE * step + EPSILON_START;
+                if (step <= exploreUntilStep) { // If in a random period
+                    actionIndex = getRandomAction();
+                } else {
+                    double epsilon = EPSILON_SLOPE * step + EPSILON_START;
 
-            if (Math.random() < epsilon) { // If starting a random period
-                actionIndex = getRandomAction();
-            } else { // AI selects
-                actionIndex = net.predictBestAction(gs, step % PRINT_FREQUENCY == 0);
+                    if (Math.random() < epsilon) { // If starting a random period
+                        actionIndex = getRandomAction();
+                    } else { // AI selects
+                        actionIndex = net.predictBestAction(states.size() - 1, step % PRINT_FREQUENCY == 0);
+                    }
+                }
             }
-        }
-    }
-} else {
-        actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
-        net.predictBestAction(gs, step % PRINT_FREQUENCY == 0));
+        } else {
+            actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
+                    net.predictBestAction(states.size(), step % PRINT_FREQUENCY == 0));
         }
 
 
         if (do_move) {
-        GameInstruction action = Directions.getInstruction(actionIndex);
-        webExe.act(action);
+            GameInstruction action = Directions.getInstruction(actionIndex);
+            webExe.act(action);
         }
 
         gs.actionIndex = actionIndex;
 
         if (step % PRINT_FREQUENCY == 0) {
-        System.out.println("step: " + step);
+            System.out.println("step: " + step);
         }
-        }
+    }
 
-private static int getRandomAction() {
+    private static int getRandomAction() {
 
         if (step > exploreUntilStep) {
-        exploreUntilStep = step + EXPLORE_STEPS;
-        exploreInstruction = Directions.randomIndex();
+            exploreUntilStep = step + EXPLORE_STEPS;
+            exploreInstruction = Directions.randomIndex();
         }
 
         return exploreInstruction;
     }
 
-    public static GameState getNext(GameState gs) {
-        return states.get(gs.stepIndex + 1);
-    }
-
-    private static void train2() {
-        ArrayList<GameState> examples = new ArrayList<>(TRAIN_N_EXAMPLES);
-
-        for (int i = 0; i < TRAIN_N_EXAMPLES; i++) {
-            examples.add(states.get(
-                    Util.rand(states.getFirstIndex() + NeuralNet4.STACK_HEIGHT, states.getLastIndex() - DEATH_BUFFER)));
-        }
-
-        System.out.println("TRAINING on " + examples.size() + " examples");
-
-
-        net.train(examples);
-        System.out.println("TRAINING COMPLETE");
+    public static GameState getState(int index) {
+        return states.get(index);
     }
 
     private static void train(int numExamples) {
         System.out.println("TRAINING");
 
         ArrayList<GameState> examples = new ArrayList<>(numExamples);
+        ArrayList<Integer> examplesIndicies = new ArrayList<>(numExamples);
 
         for (int i = 0; i < numExamples; i++) {
 
-            int rand = Util.rand(states.getFirstIndex() + NeuralNet4.STACK_HEIGHT,
-                    states.getLastIndex() - DEATH_BUFFER);
+            int rand = Util.rand(NeuralNet4.STACK_HEIGHT, states.size() - DEATH_BUFFER);
 
             GameState gs = states.get(rand);
 
             if (!gs.isTerminal) {
                 examples.add(gs);
+                examplesIndicies.add(rand);
             }
         }
 
-
         System.out.println("on " + examples.size() + " examples");
-        net.train(examples);
+        net.train(examples, examplesIndicies);
         stepLastTrained = step;
         System.out.println("TRAINING COMPLETE");
     }
 
     /**
-     * Gets the image for the state at the specified step, along with the previous (numStacked - 1) images stacked below.
+     * Gets the image for the state at the specified index, along with the previous (numStacked - 1) images stacked below.
      *
-     * @param gs         The topmost state
+     * @param topIndex   The index in the state store of the topmost state
      * @param numStacked The total number of image states to stack. Should be at least one.
      * @return The stacked image
      */
-    public static INDArray getStackedImg(GameState gs, int numStacked) {
+    public static INDArray getStackedImg(int topIndex, int numStacked) {
 
         if (numStacked == 1) {
-            return Vision4.process(gs.img);
+            return Vision4.process(states.get(topIndex).img);
         }
 
         INDArray[] arr = new INDArray[numStacked];
 
         for (int i = 0; i < numStacked; i++) {
-            arr[i] = Vision4.process(states.get(step - i).img);
+            arr[i] = Vision4.process(states.get(topIndex - i).img);
         }
 
-        return Nd4j.concat(1, arr);
+        return Nd4j.concat(1, arr); // apparently dimensions are [minibatchSize, channels, height, width]
     }
 
 }

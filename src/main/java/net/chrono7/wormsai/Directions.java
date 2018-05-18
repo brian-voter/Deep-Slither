@@ -9,8 +9,8 @@ public class Directions {
     private static final int[] relativeXVals = new int[]{-100, 0, 100};
     private static final int[] relativeYVals = new int[]{-100, 0, 100};
     private static final boolean[] boostVals = new boolean[]{false};
-    private static final int[] xVals = new int[]{10, 628, 1256, 1870};
-    private static final int[] yVals = new int[]{10, 320, 640, 960};
+    private static final int[] xVals = new int[]{100, 628, 1256, 1800};
+    private static final int[] yVals = new int[]{100, 320, 640, 900};
     private static final GameInstruction[] instructions = generateInstructions();
     public static final int numInstructions = instructions.length;
     private static Random rng = new Random();
