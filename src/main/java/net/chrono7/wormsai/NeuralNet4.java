@@ -33,7 +33,7 @@ import java.util.Random;
 
 public class NeuralNet4 {
 
-    public static final int STACK_HEIGHT = 3; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
+    public static final int STACK_HEIGHT = 1; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
     public static final int WIDTH = 200;
     public static final int HEIGHT = 100;

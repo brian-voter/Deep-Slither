@@ -13,7 +13,7 @@ public class WorkspaceManager {
     public static final String CPU_ID = "CPU_WORKSPACE";
     public static final String GPU_ID = "GPU_WORKSPACE";
     private static final long CPU_BUFFER_SIZE = 10 * (10^9);
-    private static final long GPU_BUFFER_SIZE = 4 * (10^9);
+    private static final long GPU_BUFFER_SIZE = 3 * (10^9);
 
     static {
         cpuConfig = WorkspaceConfiguration.builder()

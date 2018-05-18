@@ -17,13 +17,13 @@ public class WormsAI {
 
     public static final double GAMMA = 0.99;
     public static final boolean TRAINING_MODE = true;
-    //    private static final int NET_DRIVE_AFTER_STEP = 10_000;
-    private static final int NET_DRIVE_AFTER_STEP = 200;
+//    private static final int NET_DRIVE_AFTER_STEP = 10_000;
+        private static final int NET_DRIVE_AFTER_STEP = 200;
     private static final boolean USE_HUMAN_START = false;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    //    private static final int MIN_STEP_FOR_NET = 5000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
-    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+//    private static final int MIN_STEP_FOR_NET = 5000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+        private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
     private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 5;
     private static final int TRAIN_N_EXAMPLES = 35;
@@ -31,12 +31,12 @@ public class WormsAI {
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    //    private static final double EPSILON_END_STEP = 75_000;
-    private static final double EPSILON_END_STEP = 500;
+//    private static final double EPSILON_END_STEP = 75_000;
+        private static final double EPSILON_END_STEP = 1000;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     public static MouseListener mouseListener = new MouseListener();
-    private static CircularStore<GameState> states = new CircularStore<>(10_000);
+    private static CircularStore<GameState> states = new CircularStore<>(20_000); // 20k is estimated 5GB
     private static CircularStore<INDArray> stackBuildingBuffer = new CircularStore<>(NeuralNet4.STACK_HEIGHT - 1);
     private static WebDriverExecutor webExe;
     private static int step = 0;
