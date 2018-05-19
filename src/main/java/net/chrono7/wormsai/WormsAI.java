@@ -41,7 +41,7 @@ public class WormsAI {
     private static final boolean SAVE_NET = true;
     private static final File SCORE_RECORD = new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\scores_" + System.currentTimeMillis() + ".txt");
     public static MouseListener mouseListener = new MouseListener();
-    private static StateStore states = new StateStore(4000);
+    private static CircularStore<GameState> states = new CircularStore<>(4_000); // 20k is estimated 5GB
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;

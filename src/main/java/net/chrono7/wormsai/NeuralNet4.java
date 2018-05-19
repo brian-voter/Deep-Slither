@@ -33,10 +33,10 @@ import java.util.Random;
 
 public class NeuralNet4 {
 
-    public static final int STACK_HEIGHT = 1; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
+    public static final int STACK_HEIGHT = 3; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
-    public static final int WIDTH = 200;
-    public static final int HEIGHT = 100;
+    public static final int WIDTH = 120;
+    public static final int HEIGHT = 60;
     public static final int CHANNELS = 1; // 3 for RGB, 1 for grayscale ??
     public static final NativeImageLoader loader = new NativeImageLoader(HEIGHT, WIDTH, CHANNELS);
     private MultiLayerNetwork net;
@@ -154,12 +154,12 @@ public class NeuralNet4 {
 //                .weightInit(WeightInit.DISTRIBUTION)
 //                .dist(new NormalDistribution(0.0025, 0.01))
 //                .updater(new RmsProp(0.00025, 0.95, 0.01))
-                .updater(new Adam(0.00025))
+                .updater(new Adam(0.001))
 //                .updater(new RmsProp(0.00025, 0.95, 0.01))
                 .list()
-                .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(32).build())
-                .layer(new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(64).build())
-                .layer(new ConvolutionLayer.Builder(3, 3).padding(2, 2).stride(1, 1).nOut(64).build())
+                .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build())
+                .layer(new ConvolutionLayer.Builder(4,4).stride(2,2).nOut(32).build())
+//                .layer(new ConvolutionLayer.Builder(3, 3).stride(1, 1).nOut(32).build())
                 .layer(new DenseLayer.Builder().nOut(256).build())
 //                .layer(new OutputLayer.Builder(new LogCoshLoss())
                 .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
@@ -276,20 +276,6 @@ public class NeuralNet4 {
 
 
         INDArray labels = Q_Val(rewards, nextInputs, nextNotTerminal, labelMask);
-//        for (int i = 0; i < labels.rows(); i++) {
-//            System.out.println(labels.getRow(i));
-//        }
-
-//        while (iterator.hasNext()) {
-//            gs = iterator.next();
-//            inputLst.add(WormsAI.getStackedImg(gs, STACK_HEIGHT));
-//            labelLst.add(oneOn(Directions.numInstructions, gs.actionIndex, Q_val(gs), 0));
-//            labelMaskLst.add(oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
-//        }
-
-//        INDArray labels = Nd4j.vstack(labelLst);
-
-//        rewardScaler.transform(labels);
 
 //        net.fit(new INDArray[]{inputs}, new INDArray[]{labels}, null, new INDArray[]{labelMask});
         net.fit(inputs, labels, null, labelMask);
