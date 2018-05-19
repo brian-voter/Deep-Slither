@@ -134,8 +134,8 @@ public class WebDriverExecutor {
         gameRect = new Rectangle(tl.x, tl.y,
                 WINDOW_SIZE.width - PIXELS_LEFT, WINDOW_SIZE.height - PIXELS_UP);
 
-        boundsRect = new Rectangle(tl.x + 5, tl.y + 5,
-                WINDOW_SIZE.width - PIXELS_LEFT - 5, WINDOW_SIZE.height - PIXELS_UP - 5);
+        boundsRect = new Rectangle(tl.x + 100, tl.y + 100,
+                WINDOW_SIZE.width - PIXELS_LEFT - 100, WINDOW_SIZE.height - PIXELS_UP - 100);
 
         grabber = new FFmpegFrameGrabber("desktop");
         grabber.setOption("offset_x", String.valueOf(gameRect.x));

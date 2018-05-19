@@ -7,7 +7,10 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
 import java.awt.*;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.logging.Level;
@@ -17,26 +20,28 @@ public class WormsAI {
 
     public static final double GAMMA = 0.99;
     public static final boolean TRAINING_MODE = true;
-    //    private static final int NET_DRIVE_AFTER_STEP = 10_000;
-    private static final int NET_DRIVE_AFTER_STEP = 200;
+    private static final int NET_DRIVE_AFTER_STEP = 5_000;
+    //    private static final int NET_DRIVE_AFTER_STEP = 200;
     private static final boolean USE_HUMAN_START = false;
+    private static final boolean USE_CER = true;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    //    private static final int MIN_STEP_FOR_NET = 5000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
-    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    private static final int MIN_STEP_FOR_NET = 1000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    //    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
     private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 5;
-    private static final int TRAIN_N_EXAMPLES = 35;
-    private static final int CLONE_TARGET_EVERY_N_STEPS = 750;
+    private static final int TRAIN_N_EXAMPLES = 32;
+    private static final int CLONE_TARGET_EVERY_N_STEPS = 1000;
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    //    private static final double EPSILON_END_STEP = 75_000;
-    private static final double EPSILON_END_STEP = 500;
+    private static final double EPSILON_END_STEP = 15_000;
+    //    private static final double EPSILON_END_STEP = 500;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
+    private static final File SCORE_RECORD = new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\scores_" + System.currentTimeMillis() + ".txt");
     public static MouseListener mouseListener = new MouseListener();
-    private static StateStore states = new StateStore(20_000);
+    private static StateStore states = new StateStore(4000);
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;
@@ -47,6 +52,8 @@ public class WormsAI {
     private static Random rng = new Random();
     private static int exploreUntilStep = -1;
     private static int exploreInstruction = -1;
+    private static PrintWriter scoreWriter;
+
 
     public static void main(String[] args) {
 
@@ -57,6 +64,11 @@ public class WormsAI {
         webExe = new WebDriverExecutor();
         webExe.navigate();
 
+        try {
+            scoreWriter = new PrintWriter(SCORE_RECORD);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
 
         try {
             engage();
@@ -77,6 +89,7 @@ public class WormsAI {
         Logger.getLogger(GlobalScreen.class.getPackage().getName()).setLevel(Level.SEVERE);
     }
 
+
     private static void engage() throws InterruptedException, IOException {
 
         GameState prev = null;
@@ -89,12 +102,16 @@ public class WormsAI {
             if (webExe.testLoss()) { // Do training if we lost
                 System.out.println("LOSS");
 
+                scoreWriter.println(states.get(states.size() - 1).score);
+                scoreWriter.flush();
+
                 states.applyToLastElements(s -> {
                     s.isTerminal = true;
                     s.reward = 0;
                 }, DEATH_BUFFER);
 
                 stepLastDeath = step;
+
 
                 webExe.fixLoss();
                 Thread.sleep(1500);
@@ -114,7 +131,7 @@ public class WormsAI {
                     net.cloneTarget();
                     stepLastCloned = step;
                 }
-                train(Math.min(states.size(), TRAIN_N_EXAMPLES));
+                train(TRAIN_N_EXAMPLES);
             }
 
             int scorePre = (prev != null && !prev.isTerminal ? prev.score : 10);
@@ -217,15 +234,30 @@ public class WormsAI {
         ArrayList<GameState> examples = new ArrayList<>(numExamples);
         ArrayList<Integer> examplesIndicies = new ArrayList<>(numExamples);
 
+        if (USE_CER) {
+            for (int i = 1; i < step - stepLastTrained; i++) {
+                int index = states.size() - i - 1;
+                GameState gs = states.get(index);
+                if (!gs.isTerminal) {
+                    examples.add(gs);
+                    examplesIndicies.add(index);
+                    numExamples--;
+                }
+            }
+        }
+
         for (int i = 0; i < numExamples; i++) {
 
-            int rand = Util.rand(NeuralNet4.STACK_HEIGHT, states.size() - DEATH_BUFFER);
+            while (true) {
+                int rand = Util.rand(NeuralNet4.STACK_HEIGHT, states.size() - DEATH_BUFFER);
 
-            GameState gs = states.get(rand);
+                GameState gs = states.get(rand);
 
-            if (!gs.isTerminal) {
-                examples.add(gs);
-                examplesIndicies.add(rand);
+                if (!gs.isTerminal) {
+                    examples.add(gs);
+                    examplesIndicies.add(rand);
+                    break;
+                }
             }
         }
 

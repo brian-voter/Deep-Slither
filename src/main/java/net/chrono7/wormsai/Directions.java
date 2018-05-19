@@ -5,10 +5,10 @@ import java.util.Random;
 
 public class Directions {
 
-    public static final boolean RELATIVE = false;
+    public static final boolean RELATIVE = true;
     private static final int[] relativeXVals = new int[]{-100, 0, 100};
     private static final int[] relativeYVals = new int[]{-100, 0, 100};
-    private static final boolean[] boostVals = new boolean[]{false};
+    private static final boolean[] relativeBoostVals = new boolean[]{false, true};
     private static final int[] xVals = new int[]{100, 628, 1256, 1800};
     private static final int[] yVals = new int[]{100, 320, 640, 900};
     private static final GameInstruction[] instructions = generateInstructions();
@@ -25,12 +25,13 @@ public class Directions {
 
     private static GameInstruction[] generateInstructions() {
         if (RELATIVE) {
-            GameInstruction[] instructions = new GameInstruction[relativeXVals.length * relativeYVals.length * boostVals.length];
+            GameInstruction[] instructions = new GameInstruction[relativeXVals.length * relativeYVals.length
+                    * relativeBoostVals.length];
 
             int i = 0;
             for (int x : relativeXVals) {
                 for (int y : relativeYVals) {
-                    for (boolean b : boostVals) {
+                    for (boolean b : relativeBoostVals) {
                         instructions[i++] = new GameInstruction(new Point(x, y), b);
                     }
                 }

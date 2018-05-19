@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import static org.bytedeco.javacpp.opencv_imgcodecs.imwrite;
 import static org.bytedeco.javacpp.opencv_imgproc.*;
 
 public class Vision4 {
@@ -98,8 +97,6 @@ public class Vision4 {
         }
 
         ret.reshape(ArrayUtil.combine(new int[][]{{1}, ret.shape()}));
-
-        imwrite("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\out.png", NeuralNet4.loader.asMat(ret));
 
         NeuralNet4.scaler.transform(ret);
 
