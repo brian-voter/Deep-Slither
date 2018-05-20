@@ -4,7 +4,6 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 
 public class GameState {
 
-    //    public opencv_core.Mat img;
     public INDArray before;
     public INDArray after;
     public int score = 0;

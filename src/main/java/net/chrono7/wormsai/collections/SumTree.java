@@ -2,6 +2,7 @@ package net.chrono7.wormsai.collections;
 
 /*
 CREDIT: Adapted from https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
+
 Original Python by Jaromír Janisch
 Source: https://raw.githubusercontent.com/jaara/AI-blog/master/SumTree.py
  */
@@ -20,7 +21,7 @@ public class SumTree<E> {
 
     public SumTree(int capacity) {
         this.capacity = capacity;
-        tree = new double[2 * capacity + 1];
+        tree = new double[2 * capacity - 1];
         data = (E[]) new Object[capacity];
     }
 

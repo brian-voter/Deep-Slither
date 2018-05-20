@@ -25,10 +25,6 @@ public class StateStore {
     public double getPriority(double error) {
         return Math.pow((error + WormsAI.PER_e), WormsAI.PER_a);
     }
-//
-//    public void add(double error, GameState state) {
-//        states.add(getPriority(error), state);
-//    }
 
     public void push(GameState state) {
         GameState popped = deathBuffer.add(state);
@@ -46,7 +42,7 @@ public class StateStore {
         }
     }
 
-    //TODO: fix to return numExamples
+    //TODO: fix to return exactly numExamples
     public ArrayList<Pair<Integer, GameState>> sample(int numExamples) {
         ArrayList<Pair<Integer, GameState>> examples = new ArrayList<>();
 

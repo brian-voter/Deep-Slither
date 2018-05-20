@@ -46,8 +46,6 @@ public class WebDriverExecutor {
         proxy.start(18904);
         proxy.blacklistRequests("http://slither.io/s/bg54.jpg", 204);
         proxy.blacklistRequests("http://slither.io/s/gbg.jpg", 204);
-        //Finish setting up your driver
-
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             proxy.stop();
@@ -56,6 +54,8 @@ public class WebDriverExecutor {
         }));
 
         System.setProperty("webdriver.chrome.driver", "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\drivers\\chromedriver.exe");
+
+        //Proxy CREDIT: https://github.com/lightbody/browsermob-proxy/issues/408#issuecomment-280058077
 
         // Get BrowserMobProxy server port for PAC file
         int proxyPort = proxy.getPort();
@@ -165,9 +165,6 @@ public class WebDriverExecutor {
                 "[2]/div/div[@class='nsi']").click();
 
         delay(500);
-//        WebElement play = driver.findElements(By.className("nsi")).stream()
-//                .filter(e1 -> e1.getText().equals(" Play ")).findFirst().orElseGet(null);
-//        play.click();
 
         driver.findElementByXPath("/html/body/div[@id='login']" + // play button
                 "/div[@id='playh']/div[@class='btnt nsi sadg1']/div/div[@class='nsi']").click();
@@ -232,15 +229,6 @@ public class WebDriverExecutor {
 
     public Point getTopLeftPoint() {
         return new Point(game.getLocation().getX() + PIXELS_RIGHT, game.getLocation().getY() + PIXELS_DOWN);
-    }
-
-//    public Point getCenterPoint() {
-//        return new Point((game.getLocation().getX() + PIXELS_RIGHT + game.getSize().width - PIXELS_LEFT) / 2,
-//                (game.getLocation().getY() + PIXELS_DOWN + (game.getSize().height - PIXELS_UP) / 2));
-//    }
-
-    public java.awt.Point getMousePoint() {
-        return new java.awt.Point(lastMouseX, lastMouseY);
     }
 
     public java.awt.Point roughly(java.awt.Point point) {

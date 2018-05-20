@@ -23,6 +23,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.nd4j.linalg.ops.transforms.Transforms;
 import org.nd4j.linalg.primitives.Pair;
 
@@ -37,7 +38,7 @@ public class NeuralNet4 {
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
     public static final int WIDTH = 120;
     public static final int HEIGHT = 60;
-    public static final int CHANNELS = 1; // 3 for RGB, 1 for grayscale ??
+    public static final int CHANNELS = 1;
     public static final Java2DNativeImageLoader loader = new Java2DNativeImageLoader(HEIGHT, WIDTH, CHANNELS);
     private MultiLayerNetwork onlineNet;
     private MultiLayerNetwork targetNet;
@@ -45,7 +46,7 @@ public class NeuralNet4 {
 
     public NeuralNet4() {
         onlineNet = buildNet();
-//        net = loadNet();
+//        net = loadNet(40000);
         onlineNet.init();
 
         cloneTarget();
@@ -61,13 +62,6 @@ public class NeuralNet4 {
         onlineNet.addListeners(new StatsListener(fileStatsStorage), new StatsListener(memoryStatsStorage),
                 new ScoreIterationListener(10));
 
-//        DataSet rewardFit = new DataSet();
-
-//        INDArray rewardArr = Nd4j.vstack(Nd4j.create(Directions.numInstructions).assign(-10),
-//                Nd4j.create(Directions.numInstructions).assign(150));
-
-//        rewardFit.setFeatures(rewardArr);
-//        rewardScaler.fit(rewardFit);
     }
 
     public static INDArray oneOn(int cols, int index, Number val, Number othersVal) {
@@ -86,19 +80,20 @@ public class NeuralNet4 {
 
     private MultiLayerNetwork buildNet() {
 
+        //Dueling graph
 //        ComputationGraphConfiguration conf = new NeuralNetConfiguration.Builder()
 //                .seed(rng.nextLong())
 ////                .l2(0.005)
 //                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
 //                .activation(Activation.RELU)
-//                .weightInit(WeightInit.XAVIER)
-//                .updater(new Adam(0.00015)) //slightly lower
+//                .weightInit(WeightInit.RELU)
+//                .updater(new Adam(0.0001))
 //                .graphBuilder()
 //                .addInputs("input")
-//                .addLayer("c1", new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build(), "input")
-//                .addLayer("c2", new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(32).build(), "c1")
-//                .addLayer("c3", new ConvolutionLayer.Builder(3, 3).gradientNormalization(GradientNormalization.ClipL2PerLayer).gradientNormalizationThreshold(10).padding(2, 2).stride(1, 1).nOut(32).build(), "c2")
-//                .addVertex("gradScaler", new GradientScalerVertex(), "c3")
+//                .addLayer("c1", new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(16).build(), "input")
+//                .addLayer("c2", new ConvolutionLayer.Builder(4, 4).stride(2, 2).nOut(32).gradientNormalization(GradientNormalization.ClipL2PerLayer).gradientNormalizationThreshold(10).build(), "c1")
+////                .addLayer("c3", new ConvolutionLayer.Builder(3, 3).gradientNormalization(GradientNormalization.ClipL2PerLayer).gradientNormalizationThreshold(10).padding(2, 2).stride(1, 1).nOut(32).build(), "c2")
+//                .addVertex("gradScaler", new GradientScalerVertex(), "c2")
 //
 //                // SPLIT - Advantage
 //                .addLayer("advantageDense", new DenseLayer.Builder().nOut(256).build(), "gradScaler")
@@ -129,18 +124,17 @@ public class NeuralNet4 {
 
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(rng.nextLong())
-//                .l2(0.005)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .activation(Activation.RELU)
-                .weightInit(WeightInit.XAVIER)
-                .updater(new Adam(0.00025))
+                .weightInit(WeightInit.RELU)
+                .updater(new Adam(0.0005))
                 .list()
-                .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build())
+                .layer(new ConvolutionLayer.Builder(8, 8).stride(4, 4).nOut(16).build())
                 .layer(new ConvolutionLayer.Builder(4, 4).stride(2, 2).nOut(32).build())
-//                .layer(new ConvolutionLayer.Builder(3, 3).stride(1, 1).nOut(32).build())
+                .layer(new ConvolutionLayer.Builder(3, 3).stride(1, 1).nOut(64).build())
                 .layer(new DenseLayer.Builder().nOut(256).build())
-                .layer(new OutputLayer.Builder(new LogCoshLoss())
-//                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
+//                .layer(new OutputLayer.Builder(new LogCoshLoss())
+                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
                         .nOut(Directions.numInstructions)
                         .activation(Activation.IDENTITY)
                         .build())
@@ -151,11 +145,11 @@ public class NeuralNet4 {
         return new MultiLayerNetwork(conf);
     }
 
-    private MultiLayerNetwork loadNet() {
+    private MultiLayerNetwork loadNet(int itr) {
         MultiLayerNetwork net = null;
 
         try {
-            net = ModelSerializer.restoreMultiLayerNetwork("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\model_itr_" + 50000 + ".bin", true);
+            net = ModelSerializer.restoreMultiLayerNetwork("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\model_itr_" + itr + ".bin", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -167,7 +161,7 @@ public class NeuralNet4 {
         INDArray input = Nd4j.zeros(1, STACK_HEIGHT, HEIGHT, WIDTH);
         input.putRow(0, arr);
 
-//        INDArray output = net.outputSingle(false, arr);
+//        INDArray output = onlineNet.outputSingle(false, input);
         INDArray output = onlineNet.output(input, false);
 
         if (print) {
@@ -187,7 +181,7 @@ public class NeuralNet4 {
     //FOR MATRIX
     private INDArray predictBestAction(INDArray inputs) {
 
-//        INDArray output = net.outputSingle(false, arr);
+//        INDArray output = onlineNet.outputSingle(false, inputs);
         INDArray output = onlineNet.output(inputs, false);
 
         return output.argMax(1); // returns [inputs.rows x 1] the best action index
@@ -215,9 +209,10 @@ public class NeuralNet4 {
      * @return The Q values as a column vector
      */
     //FOR MATRIX
+//    private INDArray predictQValue(INDArray inputs, INDArray actions, MultiLayerNetwork useNet) {
     private INDArray predictQValue(INDArray inputs, INDArray actions, MultiLayerNetwork useNet) {
 
-//        INDArray output = useNet.outputSingle(false, arr); //[inputs.rows x nActions] the Q vals for each action
+//        INDArray output = useNet.outputSingle(false, inputs); //[inputs.rows x nActions] the Q vals for each action
         INDArray output = useNet.output(inputs, false); //[inputs.rows x nActions] the Q vals for each action
 
         INDArray ret = Nd4j.zeros(output.rows(), 1);
@@ -258,8 +253,7 @@ public class NeuralNet4 {
         INDArray labels = Q_Val(rewards, nextInputs, nextNotTerminal, labelMask); //labels = target
         INDArray predictions = predictQValue(inputs, actionsTaken, onlineNet);
 
-//        net.fit(new INDArray[]{inputs}, new INDArray[]{labels}, null, new INDArray[]{labelMask});
-
+//        onlineNet.fit(new INDArray[]{inputs}, new INDArray[]{labels}, null, new INDArray[]{labelMask});
         onlineNet.fit(inputs, labels, null, labelMask);
 
         //TODO: Fix bug when labels.rows() = 1

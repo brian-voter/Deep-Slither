@@ -3,7 +3,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package net.chrono7.wormsai;
+package net.chrono7.wormsai.graph;
 
 import org.deeplearning4j.nn.conf.graph.GraphVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
@@ -15,17 +15,17 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 
 import java.util.Arrays;
 
-public class AverageVertex extends GraphVertex {
+public class GradientScalerVertex extends GraphVertex {
 
-    public AverageVertex clone() {
-        return new AverageVertex();
+    public GradientScalerVertex clone() {
+        return new GradientScalerVertex();
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof AverageVertex)) {
+        if (!(o instanceof GradientScalerVertex)) {
             return false;
         } else {
-            AverageVertex s = (AverageVertex)o;
+            GradientScalerVertex s = (GradientScalerVertex) o;
             return true;
         }
     }
@@ -47,16 +47,18 @@ public class AverageVertex extends GraphVertex {
     }
 
     public org.deeplearning4j.nn.graph.vertex.GraphVertex instantiate(ComputationGraph graph, String name, int idx, INDArray paramsView, boolean initializeParams) {
-        return new AverageVertexImpl(graph, name, idx);
+        return new GradientScalerVertexImpl(graph, name, idx);
     }
 
     public InputType getOutputType(int layerIndex, InputType... vertexInputs) throws InvalidInputTypeException {
         if (vertexInputs.length != 1) {
-            throw new InvalidInputTypeException("AverageVertex expects single input type. Received: " + Arrays.toString(vertexInputs));
+            throw new InvalidInputTypeException("GradientScalerVertex expects single input type. Received: " + Arrays.toString(vertexInputs));
         } else {
-            switch(vertexInputs[0].getType()) {
+            switch (vertexInputs[0].getType()) {
                 case FF:
                     return InputType.feedForward(vertexInputs[0].arrayElementsPerExample());
+                case CNN:
+                    return vertexInputs[0];
                 default:
                     throw new RuntimeException("Only supports FF");
             }
@@ -65,10 +67,10 @@ public class AverageVertex extends GraphVertex {
 
     public MemoryReport getMemoryReport(InputType... inputTypes) {
         InputType outputType = this.getOutputType(-1, inputTypes);
-        return (new Builder((String)null, AverageVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
+        return (new Builder((String) null, GradientScalerVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
     }
 
     public String toString() {
-        return "AverageVertex()";
+        return "GradientScalerVertex()";
     }
 }

@@ -12,7 +12,6 @@ import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.util.ArrayUtil;
 
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -33,7 +32,7 @@ public class Vision4 {
      * @param m the mat to convert
      * @return the resulting INDArray
      */
-    public static INDArray process(Mat m) {
+    public static INDArray mat2INDArray(Mat m) {
 
         if (fillNDArray == null) {
             Class loader = NativeImageLoader.class;
@@ -62,22 +61,7 @@ public class Vision4 {
         return ret;
     }
 
-
-//    public static INDArray process(Mat m) {
-//
-//        try {
-//            INDArray arr = NeuralNet4.loader.asMatrix(m);
-//            NeuralNet4.scaler.transform(arr);
-//            return arr;
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//
-//
-//        return null;
-//    }
-
-    public static Mat preprocess(Frame frame) {
+    public static Mat frame2Mat(Frame frame) {
         if (frame == null) {
             return null;
         }
@@ -101,15 +85,8 @@ public class Vision4 {
             return null;
         }
 
-        try {
-            INDArray array = NeuralNet4.loader.asMatrix(frame);
-            NeuralNet4.scaler.transform(array);
-            return array;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return null;
+        Mat m = frame2Mat(frame);
+        return mat2INDArray(m);
     }
 
     private static Mat img2Mat(BufferedImage in) {

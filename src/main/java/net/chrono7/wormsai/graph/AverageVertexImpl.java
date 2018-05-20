@@ -3,7 +3,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package net.chrono7.wormsai;
+package net.chrono7.wormsai.graph;
 
 import org.deeplearning4j.nn.api.Layer;
 import org.deeplearning4j.nn.api.MaskState;

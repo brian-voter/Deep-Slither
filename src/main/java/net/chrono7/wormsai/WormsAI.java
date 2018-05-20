@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,28 +23,23 @@ public class WormsAI {
     public static final boolean TRAINING_MODE = true;
     public static final double PER_e = 0.6;
     public static final double PER_a = 0.01;
-    private static final int NET_DRIVE_AFTER_STEP = 700;
-    //    private static final int NET_DRIVE_AFTER_STEP = 200;
+    private static final int NET_DRIVE_AFTER_STEP = 5000;
     private static final boolean USE_HUMAN_START = false;
-    private static final boolean USE_CER = true;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    private static final int MIN_STEP_FOR_NET = 550; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS, > STACK_HEIGHT
-    //    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    private static final int MIN_STEP_FOR_NET = 3000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS, MAKE > CAPACITY > STACK_HEIGHT
     private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 5;
     private static final int TRAIN_N_EXAMPLES = 32;
-    private static final int CLONE_TARGET_EVERY_N_STEPS = 1000;
+    private static final int CLONE_TARGET_EVERY_N_STEPS = 500;
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
-    private static final double EPSILON_END = 0.001;
-    private static final double EPSILON_END_STEP = 1500;
-    //    private static final double EPSILON_END_STEP = 500;
+    private static final double EPSILON_END = 0.05;
+    private static final double EPSILON_END_STEP = 10_000;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     private static final File SCORE_RECORD = new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\scores_" + System.currentTimeMillis() + ".txt");
-    public static MouseListener mouseListener = new MouseListener();
-    //    private static CircularStore<GameState> states = new CircularStore<>(4_000); // 20k is estimated 5GB
+    private static MouseListener mouseListener = new MouseListener();
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;
@@ -53,11 +47,10 @@ public class WormsAI {
     private static int stepLastDeath = -1;
     private static long stepStartTime;
     private static NeuralNet4 net;
-    private static Random rng = new Random();
     private static int exploreUntilStep = -1;
     private static int exploreInstruction = -1;
     private static PrintWriter scoreWriter;
-    private static StateStore stateStore = new StateStore(5000, 20);
+    private static StateStore stateStore = new StateStore(10000, DEATH_BUFFER);
 
 
     public static void main(String[] args) {
@@ -188,7 +181,7 @@ public class WormsAI {
             if (step < NET_DRIVE_AFTER_STEP) {
 
                 if (USE_HUMAN_START) {
-                    //TODO: re-enable human start?
+                    //TODO: fix human start?
                     actionIndex = Directions.getClosest(MouseInfo.getPointerInfo().getLocation(),
                             mouseListener.isMousePressed());
                     do_move = false;
@@ -201,7 +194,7 @@ public class WormsAI {
                 if (step <= exploreUntilStep) { // If in a random period
                     actionIndex = getRandomAction();
                 } else {
-                    double epsilon = EPSILON_SLOPE * step + EPSILON_START;
+                    double epsilon = Math.max(EPSILON_SLOPE * step + EPSILON_START, EPSILON_END);
 
                     if (Math.random() < epsilon) { // If starting a random period
                         actionIndex = getRandomAction();
