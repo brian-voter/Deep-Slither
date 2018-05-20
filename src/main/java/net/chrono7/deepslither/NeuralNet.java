@@ -1,6 +1,6 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
-import net.chrono7.wormsai.state.GameState;
+import net.chrono7.deepslither.state.GameState;
 import org.datavec.image.loader.Java2DNativeImageLoader;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
@@ -32,21 +32,24 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Random;
 
-public class NeuralNet4 {
+/**
+ * @author Brian Voter
+ */
+public class NeuralNet {
 
     public static final int STACK_HEIGHT = 1; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
-    public static final int WIDTH = 120;
-    public static final int HEIGHT = 60;
+    public static final int WIDTH = 200;
+    public static final int HEIGHT = 100;
     public static final int CHANNELS = 1;
     public static final Java2DNativeImageLoader loader = new Java2DNativeImageLoader(HEIGHT, WIDTH, CHANNELS);
+    private static final double GAMMA = 0.99;
     private MultiLayerNetwork onlineNet;
     private MultiLayerNetwork targetNet;
     private Random rng = new Random();
 
-    public NeuralNet4() {
+    public NeuralNet() {
         onlineNet = buildNet();
-//        net = loadNet(40000);
         onlineNet.init();
 
         cloneTarget();
@@ -145,11 +148,11 @@ public class NeuralNet4 {
         return new MultiLayerNetwork(conf);
     }
 
-    private MultiLayerNetwork loadNet(int itr) {
+    private MultiLayerNetwork loadNet(String path) {
         MultiLayerNetwork net = null;
 
         try {
-            net = ModelSerializer.restoreMultiLayerNetwork("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\model_itr_" + itr + ".bin", true);
+            net = ModelSerializer.restoreMultiLayerNetwork(path, true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -178,7 +181,6 @@ public class NeuralNet4 {
      * @param inputs The input states
      * @return A column vector containing the best action for each input state
      */
-    //FOR MATRIX
     private INDArray predictBestAction(INDArray inputs) {
 
 //        INDArray output = onlineNet.outputSingle(false, inputs);
@@ -194,7 +196,6 @@ public class NeuralNet4 {
      * @param inputs The states to obtain the Q values for
      * @return The Q values as a column vector
      */
-    //FOR MATRIX
     private INDArray predictQValue(INDArray inputs) {
         return predictQValue(inputs, predictBestAction(inputs), targetNet);
     }
@@ -208,9 +209,8 @@ public class NeuralNet4 {
      * @param useNet  The network used to make the predictions
      * @return The Q values as a column vector
      */
-    //FOR MATRIX
-//    private INDArray predictQValue(INDArray inputs, INDArray actions, MultiLayerNetwork useNet) {
     private INDArray predictQValue(INDArray inputs, INDArray actions, MultiLayerNetwork useNet) {
+//    private INDArray predictQValue(INDArray inputs, INDArray actions, ComputationGraph useNet) {
 
 //        INDArray output = useNet.outputSingle(false, inputs); //[inputs.rows x nActions] the Q vals for each action
         INDArray output = useNet.output(inputs, false); //[inputs.rows x nActions] the Q vals for each action
@@ -272,7 +272,7 @@ public class NeuralNet4 {
      * except for the entry in the column of the action taken
      */
     private INDArray Q_Val(INDArray rewards, INDArray nextInputs, INDArray nextNotTerminal, INDArray actions) {
-        INDArray gammaQ = predictQValue(nextInputs).muli(WormsAI.GAMMA).muli(nextNotTerminal);
+        INDArray gammaQ = predictQValue(nextInputs).muli(GAMMA).muli(nextNotTerminal);
         return actions.muli(rewards.add(gammaQ));
     }
 

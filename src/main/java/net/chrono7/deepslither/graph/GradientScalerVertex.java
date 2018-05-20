@@ -3,7 +3,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package net.chrono7.wormsai.graph;
+package net.chrono7.deepslither.graph;
 
 import org.deeplearning4j.nn.conf.graph.GraphVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
@@ -15,28 +15,23 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 
 import java.util.Arrays;
 
-public class RepeatVertex extends GraphVertex {
-    private int nOut;
+public class GradientScalerVertex extends GraphVertex {
 
-    public RepeatVertex(int nOut) {
-        this.nOut = nOut;
-    }
-
-    public RepeatVertex clone() {
-        return new RepeatVertex(nOut);
+    public GradientScalerVertex clone() {
+        return new GradientScalerVertex();
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof RepeatVertex)) {
+        if (!(o instanceof GradientScalerVertex)) {
             return false;
         } else {
-            RepeatVertex s = (RepeatVertex)o;
-            return s.nOut == this.nOut;
+            GradientScalerVertex s = (GradientScalerVertex) o;
+            return true;
         }
     }
 
     public int hashCode() {
-        return (new Integer(this.nOut)).hashCode();
+        return 12;
     }
 
     public int numParams(boolean backprop) {
@@ -52,16 +47,18 @@ public class RepeatVertex extends GraphVertex {
     }
 
     public org.deeplearning4j.nn.graph.vertex.GraphVertex instantiate(ComputationGraph graph, String name, int idx, INDArray paramsView, boolean initializeParams) {
-        return new RepeatVertexImpl(graph, name, idx, this.nOut);
+        return new GradientScalerVertexImpl(graph, name, idx);
     }
 
     public InputType getOutputType(int layerIndex, InputType... vertexInputs) throws InvalidInputTypeException {
         if (vertexInputs.length != 1) {
-            throw new InvalidInputTypeException("SubsetVertex expects single input type. Received: " + Arrays.toString(vertexInputs));
+            throw new InvalidInputTypeException("GradientScalerVertex expects single input type. Received: " + Arrays.toString(vertexInputs));
         } else {
-            switch(vertexInputs[0].getType()) {
+            switch (vertexInputs[0].getType()) {
                 case FF:
-                    return InputType.feedForward(nOut);
+                    return InputType.feedForward(vertexInputs[0].arrayElementsPerExample());
+                case CNN:
+                    return vertexInputs[0];
                 default:
                     throw new RuntimeException("Only supports FF");
             }
@@ -70,16 +67,10 @@ public class RepeatVertex extends GraphVertex {
 
     public MemoryReport getMemoryReport(InputType... inputTypes) {
         InputType outputType = this.getOutputType(-1, inputTypes);
-        return (new Builder((String)null, RepeatVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
-    }
-
-    public int getNOut() { return this.nOut; }
-
-    public void setNOut(int nOut) {
-        this.nOut = nOut;
+        return (new Builder((String) null, GradientScalerVertex.class, inputTypes[0], outputType)).standardMemory(0L, 0L).workingMemory(0L, 0L, 0L, 0L).cacheMemory(0L, 0L).build();
     }
 
     public String toString() {
-        return "ReplicateVertex(nOut=" + nOut + ")";
+        return "GradientScalerVertex()";
     }
 }

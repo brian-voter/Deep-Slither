@@ -1,4 +1,4 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
 import org.jnativehook.mouse.NativeMouseEvent;
 import org.jnativehook.mouse.NativeMouseInputListener;

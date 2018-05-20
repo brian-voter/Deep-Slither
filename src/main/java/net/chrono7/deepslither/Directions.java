@@ -1,8 +1,11 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
 import java.awt.*;
 import java.util.Random;
 
+/**
+ * @author Brian Voter
+ */
 public class Directions {
 
     public static final boolean RELATIVE = true;

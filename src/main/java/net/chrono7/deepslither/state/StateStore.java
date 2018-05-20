@@ -1,18 +1,22 @@
-package net.chrono7.wormsai.state;
+package net.chrono7.deepslither.state;
 
 
-import net.chrono7.wormsai.Util;
-import net.chrono7.wormsai.WormsAI;
-import net.chrono7.wormsai.collections.CircularStore;
-import net.chrono7.wormsai.collections.SumTree;
+import net.chrono7.deepslither.Util;
+import net.chrono7.deepslither.collections.CircularStore;
+import net.chrono7.deepslither.collections.SumTree;
 import org.nd4j.linalg.primitives.Pair;
 
 import java.util.ArrayList;
 
-// Inspired by https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
-
+/**
+ * CREDIT:
+ * Inspired by and adapted from:
+ * https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
+ */
 public class StateStore {
 
+    private static final double PER_e = 0.6;
+    private static final double PER_a = 0.01;
     private SumTree<GameState> states;
     private CircularStore<GameState> deathBuffer;
     private double maxPriority = 1;
@@ -23,7 +27,7 @@ public class StateStore {
     }
 
     public double getPriority(double error) {
-        return Math.pow((error + WormsAI.PER_e), WormsAI.PER_a);
+        return Math.pow((error + PER_e), PER_a);
     }
 
     public void push(GameState state) {
@@ -42,7 +46,7 @@ public class StateStore {
         }
     }
 
-    //TODO: fix to return exactly numExamples
+    //TODO: fix to return exactly numExamples (note: can hang if a while loop is used in the for loop)
     public ArrayList<Pair<Integer, GameState>> sample(int numExamples) {
         ArrayList<Pair<Integer, GameState>> examples = new ArrayList<>();
 

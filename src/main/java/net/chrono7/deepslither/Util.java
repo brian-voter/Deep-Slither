@@ -1,7 +1,10 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * @author Brian Voter
+ */
 public class Util {
 
     public static int randInt(int minInclusive, int maxExclusive) {

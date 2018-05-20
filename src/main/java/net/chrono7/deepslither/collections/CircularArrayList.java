@@ -1,23 +1,16 @@
-package net.chrono7.wormsai.collections;
+package net.chrono7.deepslither.collections;
 
 import java.util.*;
 
 /**
  * CREDIT: http://www.museful.net/2012/software-development/circulararraylist-for-java
  *
- *
- * "
- * If you use this code, please consider notifying isak at du-preez dot com
- *  with a brief description of your application.
- *
- * This is free and unencumbered software released into the public domain.
+ * "This is free and unencumbered software released into the public domain.
  *  Anyone is free to copy, modify, publish, use, compile, sell, or
  *  distribute this software, either in source code form or as a compiled
  *  binary, for any purpose, commercial or non-commercial, and by any
- *  means.
- *  "
- */
-
+ *  means."
+ **/
 public class CircularArrayList<E>
         extends AbstractList<E> implements RandomAccess {
 

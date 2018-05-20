@@ -1,6 +1,4 @@
-//C:\Users\Brian\IdeaProjects\WormsAI\store\extensions
-
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
 import net.lightbody.bmp.BrowserMobProxy;
 import net.lightbody.bmp.BrowserMobProxyServer;
@@ -25,6 +23,9 @@ import java.util.List;
 
 import static org.apache.commons.io.FileUtils.writeStringToFile;
 
+/**
+ * @author Brian Voter
+ */
 public class WebDriverExecutor {
 
     private static final int PIXELS_RIGHT = 5;
@@ -32,20 +33,17 @@ public class WebDriverExecutor {
     private static final int PIXELS_DOWN = 80;
     private static final int PIXELS_UP = 110;
     private static final Dimension WINDOW_SIZE = new Dimension(1920, 1080);
+    private BrowserMobProxy proxy;
     private Rectangle gameRect;
     private Rectangle boundsRect;
     private ChromeDriver driver;
     private WebElement game;
     private Robot robot;
-    private int lastMouseX, lastMouseY;
     private FFmpegFrameGrabber grabber;
 
-    WebDriverExecutor() {
+    public WebDriverExecutor() {
 
-        BrowserMobProxy proxy = new BrowserMobProxyServer();
-        proxy.start(18904);
-        proxy.blacklistRequests("http://slither.io/s/bg54.jpg", 204);
-        proxy.blacklistRequests("http://slither.io/s/gbg.jpg", 204);
+        initChromeDriver();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             proxy.stop();
@@ -53,9 +51,23 @@ public class WebDriverExecutor {
             System.exit(0);
         }));
 
-        System.setProperty("webdriver.chrome.driver", "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\drivers\\chromedriver.exe");
 
-        //Proxy CREDIT: https://github.com/lightbody/browsermob-proxy/issues/408#issuecomment-280058077
+        try {
+            robot = new Robot();
+        } catch (AWTException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void initChromeDriver() {
+        //CREDIT for proxy code: https://github.com/lightbody/browsermob-proxy/issues/408#issuecomment-280058077
+
+        proxy = new BrowserMobProxyServer();
+        proxy.start(18904);
+        proxy.blacklistRequests("http://slither.io/s/bg54.jpg", 204);
+        proxy.blacklistRequests("http://slither.io/s/gbg.jpg", 204);
+
+        System.setProperty("webdriver.chrome.driver", "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\drivers\\chromedriver.exe");
 
         // Get BrowserMobProxy server port for PAC file
         int proxyPort = proxy.getPort();
@@ -82,12 +94,6 @@ public class WebDriverExecutor {
         options.setCapability(CapabilityType.PROXY, seleniumProxy);
 
         driver = new ChromeDriver(options);
-
-        try {
-            robot = new Robot();
-        } catch (AWTException e) {
-            e.printStackTrace();
-        }
     }
 
     private Point boundMousePoint(int inX, int inY) {
@@ -111,7 +117,6 @@ public class WebDriverExecutor {
     public void quitDriver() {
         driver.quit();
     }
-
 
     private void delay(long period) {
         try {
@@ -171,10 +176,11 @@ public class WebDriverExecutor {
 
         delay(5000);
 
+
+        // hide UI
         String[] elementsToHide = new String[]{"/html/body/div[9]", "/html/body/div[10]",
                 "/html/body/div[11]", "/html/body/div[12]", "/html/body/div[13]",
                 "/html/body/div[15]"};
-
         Arrays.stream(elementsToHide).map(driver::findElementByXPath).forEach(this::hideElement);
     }
 
@@ -216,7 +222,6 @@ public class WebDriverExecutor {
         driver.executeScript("arguments[0].setAttribute('style', arguments[0].getAttribute('style') + 'visibility:hidden;');",
                 element);
     }
-
 
     public Frame getScreenshot() {
         try {
@@ -272,7 +277,6 @@ public class WebDriverExecutor {
         boolean lossDetected = false;
         try {
             WebElement play = driver.findElementByXPath("/html[1]/body[1]/div[2]/div[5]/div[1]/div[1]/div[3]");
-
 
             play.click();
 

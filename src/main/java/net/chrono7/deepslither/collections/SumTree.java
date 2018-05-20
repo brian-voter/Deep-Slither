@@ -1,14 +1,14 @@
-package net.chrono7.wormsai.collections;
-
-/*
-CREDIT: Adapted from https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
-
-Original Python by Jaromír Janisch
-Source: https://raw.githubusercontent.com/jaara/AI-blog/master/SumTree.py
- */
+package net.chrono7.deepslither.collections;
 
 import org.nd4j.linalg.primitives.Pair;
 
+/**
+ * CREDIT: Adapted from:
+ * https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/.
+ *
+ * Original Python by Jaromír Janisch.
+ * Source: https://raw.githubusercontent.com/jaara/AI-blog/master/SumTree.py
+ */
 public class SumTree<E> {
 
     // Here data = elem

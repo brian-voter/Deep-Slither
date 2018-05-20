@@ -1,10 +1,13 @@
-package net.chrono7.wormsai.collections;
+package net.chrono7.deepslither.collections;
 
 
 import java.util.Arrays;
 import java.util.ListIterator;
 import java.util.function.Consumer;
 
+/**
+ * @author Brian Voter
+ */
 public class CircularStore<E> {
 
     public final int capacity;

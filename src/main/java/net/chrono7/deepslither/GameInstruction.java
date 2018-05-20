@@ -1,7 +1,10 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
 import java.awt.*;
 
+/**
+ * @author Brian Voter
+ */
 public class GameInstruction {
 
     public final Point point;

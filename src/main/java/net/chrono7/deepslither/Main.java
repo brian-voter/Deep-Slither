@@ -1,7 +1,7 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
-import net.chrono7.wormsai.state.GameState;
-import net.chrono7.wormsai.state.StateStore;
+import net.chrono7.deepslither.state.GameState;
+import net.chrono7.deepslither.state.StateStore;
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -10,19 +10,18 @@ import org.nd4j.linalg.primitives.Pair;
 import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class WormsAI {
+/**
+ * @author Brian Voter
+ */
+public class Main {
 
-    public static final double GAMMA = 0.99;
-    public static final boolean TRAINING_MODE = true;
-    public static final double PER_e = 0.6;
-    public static final double PER_a = 0.01;
+    private static final boolean TRAINING_MODE = true;
     private static final int NET_DRIVE_AFTER_STEP = 5000;
     private static final boolean USE_HUMAN_START = false;
     private static final int REFRESH_DELAY = 50;
@@ -42,11 +41,10 @@ public class WormsAI {
     private static MouseListener mouseListener = new MouseListener();
     private static WebDriverExecutor webExe;
     private static int step = 0;
-    private static int stepLastTrained = -1;
     private static int stepLastCloned = -1;
     private static int stepLastDeath = -1;
     private static long stepStartTime;
-    private static NeuralNet4 net;
+    private static NeuralNet net;
     private static int exploreUntilStep = -1;
     private static int exploreInstruction = -1;
     private static PrintWriter scoreWriter;
@@ -55,7 +53,7 @@ public class WormsAI {
 
     public static void main(String[] args) {
 
-        net = new NeuralNet4();
+        net = new NeuralNet();
 
         registerMouseListener();
 
@@ -88,7 +86,7 @@ public class WormsAI {
     }
 
 
-    private static void engage() throws InterruptedException, IOException {
+    private static void engage() throws InterruptedException {
 
         GameState prev = null;
 
@@ -100,8 +98,8 @@ public class WormsAI {
                 System.out.println("step: " + step);
             }
 
-            if (webExe.testLoss()) { // Do training if we lost
-                System.out.println("LOSS");
+            if (webExe.testLoss()) {
+                System.out.println("LOST");
 
                 scoreWriter.println(Objects.requireNonNull(prev).score);
                 scoreWriter.flush();
@@ -119,7 +117,7 @@ public class WormsAI {
                 net.save(step);
             }
 
-            INDArray imgBefore = prev != null ? prev.after : Vision4.convert(webExe.getScreenshot());
+            INDArray imgBefore = prev != null ? prev.after : Vision.frame2INDArray(webExe.getScreenshot());
             GameState gs = new GameState(imgBefore);
 
             gs.actionIndex = drive(gs.before);
@@ -146,7 +144,7 @@ public class WormsAI {
                 gs.reward = scorePost - scorePre;
             }
 
-            gs.after = Vision4.convert(webExe.getScreenshot());
+            gs.after = Vision.frame2INDArray(webExe.getScreenshot());
             stateStore.push(gs);
 
             prev = gs;
@@ -157,12 +155,12 @@ public class WormsAI {
     }
 
     private static void delay() throws InterruptedException {
-        long desiredStop = stepStartTime + REFRESH_DELAY;
+        long desiredStopTime = stepStartTime + REFRESH_DELAY;
 
         long cur = System.currentTimeMillis();
 
-        if (desiredStop > cur) {
-            Thread.sleep(desiredStop - cur);
+        if (desiredStopTime > cur) {
+            Thread.sleep(desiredStopTime - cur);
         }
     }
 
@@ -204,7 +202,7 @@ public class WormsAI {
                 }
             }
         } else {
-            actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
+            actionIndex = (step <= NeuralNet.STACK_HEIGHT ? getRandomAction() :
                     net.predictBestAction(image, step % PRINT_FREQUENCY == 0));
         }
 
@@ -227,7 +225,6 @@ public class WormsAI {
     }
 
     private static void train() {
-
         ArrayList<Pair<Integer, GameState>> sample = stateStore.sample(TRAIN_N_EXAMPLES);
         System.out.println("training on " + sample.size() + " examples");
         INDArray error = net.train(sample);
@@ -236,7 +233,6 @@ public class WormsAI {
             stateStore.update(sample.get(i).getFirst(), error.getInt(i, 0));
         }
 
-        stepLastTrained = step;
         System.out.println("TRAINING COMPLETE");
     }
 

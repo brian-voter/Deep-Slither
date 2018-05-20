@@ -1,7 +1,7 @@
-package net.chrono7.wormsai;
+package net.chrono7.deepslither;
 
-import net.chrono7.wormsai.collections.CircularStore;
-import net.chrono7.wormsai.state.GameState;
+import net.chrono7.deepslither.collections.CircularStore;
+import net.chrono7.deepslither.state.GameState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;

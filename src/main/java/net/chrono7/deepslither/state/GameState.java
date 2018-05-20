@@ -1,7 +1,10 @@
-package net.chrono7.wormsai.state;
+package net.chrono7.deepslither.state;
 
 import org.nd4j.linalg.api.ndarray.INDArray;
 
+/**
+ * @author Brian Voter
+ */
 public class GameState {
 
     public INDArray before;
