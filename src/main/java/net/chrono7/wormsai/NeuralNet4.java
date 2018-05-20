@@ -1,6 +1,7 @@
 package net.chrono7.wormsai;
 
-import org.datavec.image.loader.NativeImageLoader;
+import net.chrono7.wormsai.state.GameState;
+import org.datavec.image.loader.Java2DNativeImageLoader;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
@@ -22,33 +23,30 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.preprocessor.ImagePreProcessingScaler;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
-import org.nd4j.linalg.lossfunctions.LossFunctions;
+import org.nd4j.linalg.ops.transforms.Transforms;
+import org.nd4j.linalg.primitives.Pair;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Random;
 
 public class NeuralNet4 {
 
-    public static final int STACK_HEIGHT = 3; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
+    public static final int STACK_HEIGHT = 1; // the total number of images inputted to the network (i.e. the number of previous states used to predict the future)
     public static final ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
     public static final int WIDTH = 120;
     public static final int HEIGHT = 60;
     public static final int CHANNELS = 1; // 3 for RGB, 1 for grayscale ??
-    public static final NativeImageLoader loader = new NativeImageLoader(HEIGHT, WIDTH, CHANNELS);
-    private MultiLayerNetwork net;
+    public static final Java2DNativeImageLoader loader = new Java2DNativeImageLoader(HEIGHT, WIDTH, CHANNELS);
+    private MultiLayerNetwork onlineNet;
     private MultiLayerNetwork targetNet;
     private Random rng = new Random();
-//    private NormalizerMinMaxScaler rewardScaler = new NormalizerMinMaxScaler();
 
     public NeuralNet4() {
-
-        net = buildNet();
+        onlineNet = buildNet();
 //        net = loadNet();
-        net.init();
+        onlineNet.init();
 
         cloneTarget();
 
@@ -60,7 +58,7 @@ public class NeuralNet4 {
                 new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\stats_" +
                         System.currentTimeMillis() + ".dl4j"));
 
-        net.addListeners(new StatsListener(fileStatsStorage), new StatsListener(memoryStatsStorage),
+        onlineNet.addListeners(new StatsListener(fileStatsStorage), new StatsListener(memoryStatsStorage),
                 new ScoreIterationListener(10));
 
 //        DataSet rewardFit = new DataSet();
@@ -70,15 +68,6 @@ public class NeuralNet4 {
 
 //        rewardFit.setFeatures(rewardArr);
 //        rewardScaler.fit(rewardFit);
-    }
-
-    public static INDArray pileSelf(INDArray arr, int times) {
-        ArrayList<INDArray> pile = new ArrayList<>(times);
-        for (int i = 0; i < times; i++) {
-            pile.add(arr);
-        }
-
-        return Nd4j.pile(pile);
     }
 
     public static INDArray oneOn(int cols, int index, Number val, Number othersVal) {
@@ -91,12 +80,8 @@ public class NeuralNet4 {
 
     public void cloneTarget() {
         System.out.println("Cloning target network...");
-        this.targetNet = net.clone();
+        this.targetNet = onlineNet.clone();
         System.out.println("Cloned!");
-    }
-
-    public void scaleImg(INDArray img) {
-        scaler.transform(img);
     }
 
     private MultiLayerNetwork buildNet() {
@@ -107,9 +92,6 @@ public class NeuralNet4 {
 //                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
 //                .activation(Activation.RELU)
 //                .weightInit(WeightInit.XAVIER)
-////                .weightInit(WeightInit.DISTRIBUTION)
-////                .dist(new NormalDistribution(0.0025, 0.01))
-////                .updater(new RmsProp(0.00025, 0.95, 0.01))
 //                .updater(new Adam(0.00015)) //slightly lower
 //                .graphBuilder()
 //                .addInputs("input")
@@ -151,18 +133,14 @@ public class NeuralNet4 {
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .activation(Activation.RELU)
                 .weightInit(WeightInit.XAVIER)
-//                .weightInit(WeightInit.DISTRIBUTION)
-//                .dist(new NormalDistribution(0.0025, 0.01))
-//                .updater(new RmsProp(0.00025, 0.95, 0.01))
-                .updater(new Adam(0.001))
-//                .updater(new RmsProp(0.00025, 0.95, 0.01))
+                .updater(new Adam(0.00025))
                 .list()
                 .layer(new ConvolutionLayer.Builder(16, 16).stride(8, 8).nOut(16).build())
-                .layer(new ConvolutionLayer.Builder(4,4).stride(2,2).nOut(32).build())
+                .layer(new ConvolutionLayer.Builder(4, 4).stride(2, 2).nOut(32).build())
 //                .layer(new ConvolutionLayer.Builder(3, 3).stride(1, 1).nOut(32).build())
                 .layer(new DenseLayer.Builder().nOut(256).build())
-//                .layer(new OutputLayer.Builder(new LogCoshLoss())
-                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
+                .layer(new OutputLayer.Builder(new LogCoshLoss())
+//                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.MSE)
                         .nOut(Directions.numInstructions)
                         .activation(Activation.IDENTITY)
                         .build())
@@ -185,23 +163,12 @@ public class NeuralNet4 {
         return net;
     }
 
-    /**
-     * Returns the index of the action predicted to be "best" given the state arr.
-     *
-     * @param stateIndex The index of the state in the state store
-     * @param print      Set to true to print the predicted Q values for each action
-     * @return the index of the best action
-     */
-    public int predictBestAction(int stateIndex, boolean print) {
+    public int predictBestAction(INDArray arr, boolean print) {
         INDArray input = Nd4j.zeros(1, STACK_HEIGHT, HEIGHT, WIDTH);
-        input.putRow(0, WormsAI.getStackedImg(stateIndex, STACK_HEIGHT));
-        return predictBestAction(input, print);
-    }
-
-    private int predictBestAction(INDArray arr, boolean print) {
+        input.putRow(0, arr);
 
 //        INDArray output = net.outputSingle(false, arr);
-        INDArray output = net.output(arr, false);
+        INDArray output = onlineNet.output(input, false);
 
         if (print) {
             System.out.println(output);
@@ -210,90 +177,114 @@ public class NeuralNet4 {
         return output.argMax(1).getInt(0);
     }
 
+    /**
+     * Returns the highest quality action for the input states
+     * according to the online network.
+     *
+     * @param inputs The input states
+     * @return A column vector containing the best action for each input state
+     */
     //FOR MATRIX
-    private INDArray predictBestAction(INDArray arr) {
+    private INDArray predictBestAction(INDArray inputs) {
 
 //        INDArray output = net.outputSingle(false, arr);
-        INDArray output = net.output(arr, false);
+        INDArray output = onlineNet.output(inputs, false);
 
-        return output.argMax(1);
+        return output.argMax(1); // returns [inputs.rows x 1] the best action index
     }
 
-//    private double predictQValue(int stateIndex) {
-//
-//        INDArray arr = WormsAI.getStackedImg(stateIndex, STACK_HEIGHT);
-//
-//        int bestAction = predictBestAction(arr, false);
-//
-//        INDArray output = targetNet.outputSingle(false, arr);
-////        INDArray output = targetNet.output(arr, false);
-//
-//        return output.getDouble(bestAction);
-//    }
-
+    /**
+     * Returns the Q values of the input states, where the action argument is the best action as
+     * decided by the online network and the Q value is determined by the target network
+     *
+     * @param inputs The states to obtain the Q values for
+     * @return The Q values as a column vector
+     */
     //FOR MATRIX
-    private INDArray predictQValue(INDArray arr) {
-        INDArray bestActions = predictBestAction(arr); // [inputs.rows x 1] the best action index
+    private INDArray predictQValue(INDArray inputs) {
+        return predictQValue(inputs, predictBestAction(inputs), targetNet);
+    }
 
-//        INDArray output = targetNet.outputSingle(false, arr); //[inputs.rows x nActions] the Q vals for each action
-        INDArray output = targetNet.output(arr, false); //[inputs.rows x nActions] the Q vals for each action
+    /**
+     * Returns the Q values of the inputs according to useNet, where the action index is provided by the column vector actions.
+     * Q(s, a)
+     *
+     * @param inputs  The states as arguments to the Q function
+     * @param actions The actions as arguments to the Q function
+     * @param useNet  The network used to make the predictions
+     * @return The Q values as a column vector
+     */
+    //FOR MATRIX
+    private INDArray predictQValue(INDArray inputs, INDArray actions, MultiLayerNetwork useNet) {
+
+//        INDArray output = useNet.outputSingle(false, arr); //[inputs.rows x nActions] the Q vals for each action
+        INDArray output = useNet.output(inputs, false); //[inputs.rows x nActions] the Q vals for each action
 
         INDArray ret = Nd4j.zeros(output.rows(), 1);
 
         for (int row = 0; row < ret.rows(); row++) {
-            ret.put(row, 0, output.getScalar(row, bestActions.getInt(row, 0)));
+            ret.put(row, 0, output.getScalar(row, actions.getInt(row, 0)));
         }
 
         return ret;
     }
 
-    public void train(Collection<GameState> gameStates, ArrayList<Integer> examplesIndicies) {
+    /**
+     * Trains the network(s) using the states
+     *
+     * @param states the states to train on
+     * @return a column vector containing the error for each state
+     */
+    public INDArray train(Collection<Pair<Integer, GameState>> states) {
+        INDArray inputs = Nd4j.zeros(states.size(), STACK_HEIGHT, HEIGHT, WIDTH);
+        INDArray actionsTaken = Nd4j.zeros(states.size(), 1);
+        INDArray nextInputs = Nd4j.zeros(states.size(), STACK_HEIGHT, HEIGHT, WIDTH);
+        INDArray labelMask = Nd4j.zeros(states.size(), Directions.numInstructions);
+        INDArray rewards = Nd4j.zeros(states.size(), 1);
+        INDArray nextNotTerminal = Nd4j.zeros(states.size(), 1);
 
-        Iterator<GameState> iterator = gameStates.iterator();
-//
-//        LinkedList<INDArray> inputLst = new LinkedList<>();
-//        LinkedList<INDArray> labelLst = new LinkedList<>();
-//        LinkedList<INDArray> labelMaskLst = new LinkedList<>();
-
-        INDArray inputs = Nd4j.zeros(gameStates.size(), STACK_HEIGHT, HEIGHT, WIDTH);
-        INDArray nextInputs = Nd4j.zeros(gameStates.size(), STACK_HEIGHT, HEIGHT, WIDTH);
-        INDArray labelMask = Nd4j.zeros(gameStates.size(), Directions.numInstructions);
-        INDArray rewards = Nd4j.zeros(gameStates.size(), 1);
-        INDArray nextNotTerminal = Nd4j.zeros(gameStates.size(), 1);
-
-        GameState gs;
         int row = 0;
-        while (iterator.hasNext()) {
-            gs = iterator.next();
-            GameState ns = WormsAI.getState(examplesIndicies.get(row) + 1);
-            inputs.putRow(row, WormsAI.getStackedImg(examplesIndicies.get(row), STACK_HEIGHT));
-            nextInputs.putRow(row, WormsAI.getStackedImg(examplesIndicies.get(row), STACK_HEIGHT));
+        for (Pair<Integer, GameState> elem : states) {
+            GameState gs = elem.getRight();
+            inputs.putRow(row, gs.before);
+            nextInputs.putRow(row, gs.after);
+            actionsTaken.put(row, 0, gs.actionIndex);
             labelMask.putRow(row, oneOn(Directions.numInstructions, gs.actionIndex, 1, 0));
             rewards.put(row, 0, gs.reward);
-            nextNotTerminal.put(row, 0, !ns.isTerminal ? 1 : 0);
+            nextNotTerminal.put(row, 0, !gs.isTerminal ? 1 : 0);
             row++;
         }
 
-
-        INDArray labels = Q_Val(rewards, nextInputs, nextNotTerminal, labelMask);
+        INDArray labels = Q_Val(rewards, nextInputs, nextNotTerminal, labelMask); //labels = target
+        INDArray predictions = predictQValue(inputs, actionsTaken, onlineNet);
 
 //        net.fit(new INDArray[]{inputs}, new INDArray[]{labels}, null, new INDArray[]{labelMask});
-        net.fit(inputs, labels, null, labelMask);
+
+        onlineNet.fit(inputs, labels, null, labelMask);
+
+        //TODO: Fix bug when labels.rows() = 1
+        return Transforms.abs(labels.max(0).sub(predictions));
     }
 
+    /**
+     * Gets the target Q values for the specified argument inputs
+     *
+     * @param rewards         The rewards for each transition as a column vector
+     * @param nextInputs      The images for the post transition states
+     * @param nextNotTerminal A column vector s.t. each row contains 1 if the post state is not terminal, 0 otherwise
+     * @param actions         The action causing the transition: a matrix where each row contains 0s except for one
+     *                        1 in the column whose index matches the action taken. Aka the label mask
+     * @return The Q value labels for each example. Shape is [nExamples, nActions]. For each row, all entries are 0
+     * except for the entry in the column of the action taken
+     */
     private INDArray Q_Val(INDArray rewards, INDArray nextInputs, INDArray nextNotTerminal, INDArray actions) {
         INDArray gammaQ = predictQValue(nextInputs).muli(WormsAI.GAMMA).muli(nextNotTerminal);
         return actions.muli(rewards.add(gammaQ));
     }
 
-//    private double Q_val(GameState gs) {
-//        GameState next = WormsAI.getNext(gs);
-//        return next.reward + WormsAI.GAMMA * (next.isTerminal ? 0 : predictQValue(next));
-//    }
-
     public void save(int step) {
         try {
-            ModelSerializer.writeModel(net, "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\model_itr_" + step + ".bin", true);
+            ModelSerializer.writeModel(onlineNet, "C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\model_itr_" + step + ".bin", true);
         } catch (IOException e) {
             e.printStackTrace();
         }

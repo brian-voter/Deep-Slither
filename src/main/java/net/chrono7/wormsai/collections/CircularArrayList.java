@@ -1,4 +1,4 @@
-package net.chrono7.wormsai;
+package net.chrono7.wormsai.collections;
 
 import java.util.*;
 

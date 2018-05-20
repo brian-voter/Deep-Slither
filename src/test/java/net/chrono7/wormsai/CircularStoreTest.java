@@ -1,5 +1,7 @@
 package net.chrono7.wormsai;
 
+import net.chrono7.wormsai.collections.CircularStore;
+import net.chrono7.wormsai.state.GameState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -22,22 +24,22 @@ class CircularStoreTest {
 
     @Test
     void applyToLastElements() {
-        states.add(new GameState(null, 0), new GameState(null, 1),
-                new GameState(null, 2), new GameState(null, 3));
+        states.add(new GameState(null), new GameState(null),
+                new GameState(null), new GameState(null));
 
         assertEquals(states.size(), 4);
 
         states.applyToLastElements(s -> s.reward = 7, 2);
-        assertEquals(states.get(0).reward, Integer.MIN_VALUE);
-        assertEquals(states.get(1).reward, Integer.MIN_VALUE);
+        assertEquals(states.get(0).reward, 0);
+        assertEquals(states.get(1).reward, 0);
         assertEquals(states.get(2).reward, 7);
         assertEquals(states.get(3).reward, 7);
 
-        states.applyToLastElements(s -> s.reward = 0, 1);
-        assertEquals(states.get(0).reward, Integer.MIN_VALUE);
-        assertEquals(states.get(1).reward, Integer.MIN_VALUE);
+        states.applyToLastElements(s -> s.reward = 4, 1);
+        assertEquals(states.get(0).reward, 0);
+        assertEquals(states.get(1).reward, 0);
         assertEquals(states.get(2).reward, 7);
-        assertEquals(states.get(3).reward, 0);
+        assertEquals(states.get(3).reward, 4);
 
         states.applyToLastElements(s -> s.reward = 1, 4);
         assertEquals(states.get(0).reward, 1);
@@ -55,18 +57,18 @@ class CircularStoreTest {
     @Test
     void add() {
         assertEquals(states.size(), 0);
-        states.add(new GameState(null, 0));
+        states.add(new GameState(null));
         assertEquals(states.size(), 1);
 
         states.clear();
         assertEquals(states.size(), 0);
 
         for (int i = 0; i < states.capacity; i++) {
-            states.add(new GameState(null, i));
+            states.add(new GameState(null));
         }
         assertEquals(states.size(), states.capacity);
 
-        states.add(new GameState(null, states.capacity + 1));
+        states.add(new GameState(null));
         assertEquals(states.size(), states.capacity);
 
     }
@@ -74,7 +76,7 @@ class CircularStoreTest {
     @Test
     void clear() {
         for (int i = 0; i < 10; i++) {
-            states.add(new GameState(null, i));
+            states.add(new GameState(null));
         }
         assertEquals(states.size(), 10);
 

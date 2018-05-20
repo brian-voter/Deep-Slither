@@ -1,10 +1,11 @@
 package net.chrono7.wormsai;
 
-import org.bytedeco.javacv.Frame;
+import net.chrono7.wormsai.state.GameState;
+import net.chrono7.wormsai.state.StateStore;
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.primitives.Pair;
 
 import java.awt.*;
 import java.io.File;
@@ -12,6 +13,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -20,13 +22,15 @@ public class WormsAI {
 
     public static final double GAMMA = 0.99;
     public static final boolean TRAINING_MODE = true;
-    private static final int NET_DRIVE_AFTER_STEP = 5_000;
+    public static final double PER_e = 0.6;
+    public static final double PER_a = 0.01;
+    private static final int NET_DRIVE_AFTER_STEP = 700;
     //    private static final int NET_DRIVE_AFTER_STEP = 200;
     private static final boolean USE_HUMAN_START = false;
     private static final boolean USE_CER = true;
     private static final int REFRESH_DELAY = 50;
     private static final int EXPLORE_STEPS = 5;
-    private static final int MIN_STEP_FOR_NET = 1000; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
+    private static final int MIN_STEP_FOR_NET = 550; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS, > STACK_HEIGHT
     //    private static final int MIN_STEP_FOR_NET = 100; // MAKE DIVISIBLE BY TRAIN_EVERY_N_STEPS
     private static final int DEATH_BUFFER = 20;
     private static final int TRAIN_EVERY_N_STEPS = 5;
@@ -35,13 +39,13 @@ public class WormsAI {
     private static final int PRINT_FREQUENCY = 10;
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_END = 0.001;
-    private static final double EPSILON_END_STEP = 15_000;
+    private static final double EPSILON_END_STEP = 1500;
     //    private static final double EPSILON_END_STEP = 500;
     private static final double EPSILON_SLOPE = (EPSILON_END - EPSILON_START) / EPSILON_END_STEP;
     private static final boolean SAVE_NET = true;
     private static final File SCORE_RECORD = new File("C:\\Users\\Brian\\IdeaProjects\\WormsAI\\store\\misc\\scores_" + System.currentTimeMillis() + ".txt");
     public static MouseListener mouseListener = new MouseListener();
-    private static CircularStore<GameState> states = new CircularStore<>(4_000); // 20k is estimated 5GB
+    //    private static CircularStore<GameState> states = new CircularStore<>(4_000); // 20k is estimated 5GB
     private static WebDriverExecutor webExe;
     private static int step = 0;
     private static int stepLastTrained = -1;
@@ -53,6 +57,7 @@ public class WormsAI {
     private static int exploreUntilStep = -1;
     private static int exploreInstruction = -1;
     private static PrintWriter scoreWriter;
+    private static StateStore stateStore = new StateStore(5000, 20);
 
 
     public static void main(String[] args) {
@@ -97,41 +102,41 @@ public class WormsAI {
         while (true) {
 
             stepStartTime = System.currentTimeMillis();
-            Frame capture = webExe.getScreenshot();
+
+            if (step % PRINT_FREQUENCY == 0) {
+                System.out.println("step: " + step);
+            }
 
             if (webExe.testLoss()) { // Do training if we lost
                 System.out.println("LOSS");
 
-                scoreWriter.println(states.get(states.size() - 1).score);
+                scoreWriter.println(Objects.requireNonNull(prev).score);
                 scoreWriter.flush();
 
-                states.applyToLastElements(s -> {
-                    s.isTerminal = true;
-                    s.reward = 0;
-                }, DEATH_BUFFER);
+                stateStore.notifyDeath();
 
                 stepLastDeath = step;
 
 
                 webExe.fixLoss();
-                Thread.sleep(1500);
+                Thread.sleep(2000);
             }
 
             if (step % 10000 == 0 && SAVE_NET) {
                 net.save(step);
             }
 
-            GameState gs = new GameState(capture, step);
-            states.add(gs);
+            INDArray imgBefore = prev != null ? prev.after : Vision4.convert(webExe.getScreenshot());
+            GameState gs = new GameState(imgBefore);
 
-            drive(gs);
+            gs.actionIndex = drive(gs.before);
 
             if (step >= MIN_STEP_FOR_NET && step % TRAIN_EVERY_N_STEPS == 0) {
                 if (step - stepLastCloned > CLONE_TARGET_EVERY_N_STEPS || step == MIN_STEP_FOR_NET) {
                     net.cloneTarget();
                     stepLastCloned = step;
                 }
-                train(TRAIN_N_EXAMPLES);
+                train();
             }
 
             int scorePre = (prev != null && !prev.isTerminal ? prev.score : 10);
@@ -147,6 +152,9 @@ public class WormsAI {
                 gs.score = scorePost;
                 gs.reward = scorePost - scorePre;
             }
+
+            gs.after = Vision4.convert(webExe.getScreenshot());
+            stateStore.push(gs);
 
             prev = gs;
 
@@ -165,7 +173,13 @@ public class WormsAI {
         }
     }
 
-    private static void drive(GameState gs) {
+    /**
+     * Moves the mouse and boosts based on the action policy.
+     *
+     * @param image the input state
+     * @return the action taken
+     */
+    private static int drive(INDArray image) {
         int actionIndex;
         boolean do_move = true;
 
@@ -192,26 +206,21 @@ public class WormsAI {
                     if (Math.random() < epsilon) { // If starting a random period
                         actionIndex = getRandomAction();
                     } else { // AI selects
-                        actionIndex = net.predictBestAction(states.size() - 1, step % PRINT_FREQUENCY == 0);
+                        actionIndex = net.predictBestAction(image, step % PRINT_FREQUENCY == 0);
                     }
                 }
             }
         } else {
             actionIndex = (step <= NeuralNet4.STACK_HEIGHT ? getRandomAction() :
-                    net.predictBestAction(states.size(), step % PRINT_FREQUENCY == 0));
+                    net.predictBestAction(image, step % PRINT_FREQUENCY == 0));
         }
-
 
         if (do_move) {
             GameInstruction action = Directions.getInstruction(actionIndex);
             webExe.act(action);
         }
 
-        gs.actionIndex = actionIndex;
-
-        if (step % PRINT_FREQUENCY == 0) {
-            System.out.println("step: " + step);
-        }
+        return actionIndex;
     }
 
     private static int getRandomAction() {
@@ -224,69 +233,18 @@ public class WormsAI {
         return exploreInstruction;
     }
 
-    public static GameState getState(int index) {
-        return states.get(index);
-    }
+    private static void train() {
 
-    private static void train(int numExamples) {
-        System.out.println("TRAINING");
+        ArrayList<Pair<Integer, GameState>> sample = stateStore.sample(TRAIN_N_EXAMPLES);
+        System.out.println("training on " + sample.size() + " examples");
+        INDArray error = net.train(sample);
 
-        ArrayList<GameState> examples = new ArrayList<>(numExamples);
-        ArrayList<Integer> examplesIndicies = new ArrayList<>(numExamples);
-
-        if (USE_CER) {
-            for (int i = 1; i < step - stepLastTrained; i++) {
-                int index = states.size() - i - 1;
-                GameState gs = states.get(index);
-                if (!gs.isTerminal) {
-                    examples.add(gs);
-                    examplesIndicies.add(index);
-                    numExamples--;
-                }
-            }
+        for (int i = 0; i < error.rows(); i++) {
+            stateStore.update(sample.get(i).getFirst(), error.getInt(i, 0));
         }
 
-        for (int i = 0; i < numExamples; i++) {
-
-            while (true) {
-                int rand = Util.rand(NeuralNet4.STACK_HEIGHT, states.size() - DEATH_BUFFER);
-
-                GameState gs = states.get(rand);
-
-                if (!gs.isTerminal) {
-                    examples.add(gs);
-                    examplesIndicies.add(rand);
-                    break;
-                }
-            }
-        }
-
-        System.out.println("on " + examples.size() + " examples");
-        net.train(examples, examplesIndicies);
         stepLastTrained = step;
         System.out.println("TRAINING COMPLETE");
-    }
-
-    /**
-     * Gets the image for the state at the specified index, along with the previous (numStacked - 1) images stacked below.
-     *
-     * @param topIndex   The index in the state store of the topmost state
-     * @param numStacked The total number of image states to stack. Should be at least one.
-     * @return The stacked image
-     */
-    public static INDArray getStackedImg(int topIndex, int numStacked) {
-
-        if (numStacked == 1) {
-            return Vision4.process(states.get(topIndex).img);
-        }
-
-        INDArray[] arr = new INDArray[numStacked];
-
-        for (int i = 0; i < numStacked; i++) {
-            arr[i] = Vision4.process(states.get(topIndex - i).img);
-        }
-
-        return Nd4j.concat(1, arr); // apparently dimensions are [minibatchSize, channels, height, width]
     }
 
 }

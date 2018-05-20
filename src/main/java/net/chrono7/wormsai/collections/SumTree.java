@@ -1,4 +1,4 @@
-package net.chrono7.wormsai;
+package net.chrono7.wormsai.collections;
 
 /*
 CREDIT: Adapted from https://jaromiru.com/2016/11/07/lets-make-a-dqn-double-learning-and-prioritized-experience-replay/
@@ -6,24 +6,26 @@ Original Python by Jaromír Janisch
 Source: https://raw.githubusercontent.com/jaara/AI-blog/master/SumTree.py
  */
 
+import org.nd4j.linalg.primitives.Pair;
+
 public class SumTree<E> {
 
     // Here data = elem
     // and  p    = key
 
     public final int capacity;
-    private final int[] tree;
+    private final double[] tree;
     private final E[] data;
     private int write = 0;
 
     public SumTree(int capacity) {
         this.capacity = capacity;
-        tree = new int[2 * this.capacity + 1];
+        tree = new double[2 * capacity + 1];
         data = (E[]) new Object[capacity];
     }
 
     //key = p, elem = data
-    private void propagate(int idx, int change) {
+    private void propagate(int idx, double change) {
         int parent = (idx - 1) / 2;
 
         tree[parent] += change;
@@ -33,7 +35,7 @@ public class SumTree<E> {
         }
     }
 
-    private int retrieve(int idx, int s) {
+    private int retrieve(int idx, double s) {
         int left = 2 * idx + 1;
         int right = left + 1;
 
@@ -48,12 +50,12 @@ public class SumTree<E> {
         }
     }
 
-    public int total() {
+    public double total() {
         return tree[0];
     }
 
     //key = p, elem = data
-    public void add(int key, E elem) {
+    public void add(double key, E elem) {
         int idx = write + capacity - 1;
 
         data[write] = elem;
@@ -65,20 +67,20 @@ public class SumTree<E> {
         }
     }
 
-    public void update(int idx, int key) {
-        int change = key - tree[idx];
+    public void update(int idx, double key) {
+        double change = key - tree[idx];
 
         tree[idx] = key;
         propagate(idx, change);
     }
 
-    public E get(int s) {
+    public Pair<Integer, E> get(double s) {
         int idx = retrieve(0, s);
-        int dataIdx = idx = capacity + 1;
+        int dataIdx = idx - capacity + 1;
 
 
         //TODO: return more?
-        return data[dataIdx];
+        return new Pair<>(idx, data[dataIdx]);
     }
 
 

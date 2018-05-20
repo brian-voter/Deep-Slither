@@ -1,4 +1,4 @@
-package net.chrono7.wormsai;
+package net.chrono7.wormsai.collections;
 
 
 import java.util.Arrays;
@@ -21,16 +21,21 @@ public class CircularStore<E> {
 
     /**
      * Adds a element to the store at the end of the list. The element at index 0 is
-     * removed if the list is full before the element is added.
+     * removed and returned if the list is full before the element is added.
      *
      * @param gs The element to add
+     *
+     * @return the element that was removed, or null if no element was removed.
      */
-    public void add(E gs) {
+    public E add(E gs) {
+        E removed = null;
         if (list.size() == capacity) {
-            list.remove(0);
+            removed = list.remove(0);
         }
 
         list.add(gs);
+
+        return removed;
     }
 
     /**

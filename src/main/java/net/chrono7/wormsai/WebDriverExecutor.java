@@ -244,7 +244,7 @@ public class WebDriverExecutor {
     }
 
     public java.awt.Point roughly(java.awt.Point point) {
-        return new java.awt.Point(Util.rand(point.x - 2, point.x + 2), Util.rand(point.y - 2, point.y + 2));
+        return new java.awt.Point(Util.randInt(point.x - 2, point.x + 2), Util.randInt(point.y - 2, point.y + 2));
     }
 
     public void point(java.awt.Point point) {
