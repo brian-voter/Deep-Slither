@@ -1,5 +1,4 @@
 # Deep-Slither
-
 Training a deep neural network to play the game slither.io. 
 
 This was a semester project for CS 6700 | Advanced AI at Cornell. 
